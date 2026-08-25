@@ -4,6 +4,7 @@ const express = require('express')
 const cors = require('cors')
 const fs = require('fs')
 const path = require('path')
+const { createClient } = require('@supabase/supabase-js')
 
 const app = express()
 const PORT = 3001
@@ -11,6 +12,29 @@ const PORT = 3001
 const PROJECT_ROOT = path.resolve(
   'C:\\Users\\user\\my-ai-app'
 )
+
+// --------------------------------------------------
+// SUPABASE
+// --------------------------------------------------
+
+const supabaseUrl = process.env.SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error(
+    'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env'
+  )
+  process.exit(1)
+}
+
+const supabase = createClient(
+  supabaseUrl,
+  supabaseKey
+)
+
+// --------------------------------------------------
+// EXPRESS
+// --------------------------------------------------
 
 app.use(cors())
 app.use(express.json({ limit: '20mb' }))
@@ -33,7 +57,7 @@ app.get('/api/health', (req, res) => {
 })
 
 // --------------------------------------------------
-// SAFE PROJECT PATH
+// SAFE FILE PATH
 // --------------------------------------------------
 
 function getSafePath(filePath) {
@@ -85,7 +109,9 @@ app.post('/api/files/write', (req, res) => {
 
     const absolutePath = getSafePath(filePath)
 
-    const directory = path.dirname(absolutePath)
+    const directory = path.dirname(
+      absolutePath
+    )
 
     fs.mkdirSync(directory, {
       recursive: true,
@@ -101,7 +127,7 @@ app.post('/api/files/write', (req, res) => {
       `File written: ${absolutePath}`
     )
 
-    return res.json({
+    res.json({
       success: true,
       filePath,
       absolutePath,
@@ -112,7 +138,7 @@ app.post('/api/files/write', (req, res) => {
       error
     )
 
-    return res.status(500).json({
+    res.status(500).json({
       error: error.message,
     })
   }
@@ -140,20 +166,12 @@ app.post('/api/files/read', (req, res) => {
       })
     }
 
-    const stats = fs.statSync(absolutePath)
-
-    if (!stats.isFile()) {
-      return res.status(400).json({
-        error: 'The requested path is not a file.',
-      })
-    }
-
     const content = fs.readFileSync(
       absolutePath,
       'utf8'
     )
 
-    return res.json({
+    res.json({
       success: true,
       filePath,
       content,
@@ -164,127 +182,112 @@ app.post('/api/files/read', (req, res) => {
       error
     )
 
-    return res.status(500).json({
+    res.status(500).json({
       error: error.message,
     })
   }
 })
 
 // --------------------------------------------------
-// LIST PROJECT FILES
+// SAVE MESSAGE TO SUPABASE
 // --------------------------------------------------
 
-app.post('/api/files/list', (req, res) => {
+async function saveMessage(
+  sessionId,
+  role,
+  content
+) {
+  const { error } = await supabase
+    .from('chat_messages')
+    .insert({
+      session_id: sessionId,
+      role,
+      content,
+    })
+
+  if (error) {
+    console.error(
+      'Supabase save error:',
+      error
+    )
+
+    throw error
+  }
+}
+
+// --------------------------------------------------
+// GET CHAT HISTORY
+// --------------------------------------------------
+
+app.get('/api/chat/history/:sessionId', async (
+  req,
+  res
+) => {
   try {
-    function scanDirectory(directory) {
-      const entries = fs.readdirSync(
-        directory,
-        {
-          withFileTypes: true,
-        }
+    const { sessionId } = req.params
+
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select('id, session_id, role, content, created_at')
+      .eq('session_id', sessionId)
+      .order('created_at', {
+        ascending: true,
+      })
+
+    if (error) {
+      console.error(
+        'Supabase history error:',
+        error
       )
 
-      const files = []
-
-      for (const entry of entries) {
-        const fullPath = path.join(
-          directory,
-          entry.name
-        )
-
-        if (entry.isDirectory()) {
-          if (
-            entry.name === 'node_modules' ||
-            entry.name === '.git' ||
-            entry.name.startsWith('.')
-          ) {
-            continue
-          }
-
-          files.push(
-            ...scanDirectory(fullPath)
-          )
-        } else {
-          files.push(
-            path.relative(
-              PROJECT_ROOT,
-              fullPath
-            )
-          )
-        }
-      }
-
-      return files
+      return res.status(500).json({
+        error: error.message,
+      })
     }
 
-    const files = scanDirectory(
-      PROJECT_ROOT
-    )
-
-    return res.json({
+    res.json({
       success: true,
-      files,
+      messages: data || [],
     })
   } catch (error) {
     console.error(
-      'File list error:',
+      'History error:',
       error
     )
 
-    return res.status(500).json({
+    res.status(500).json({
       error: error.message,
     })
   }
 })
 
 // --------------------------------------------------
-// DELETE FILE
+// DELETE CHAT HISTORY
 // --------------------------------------------------
 
-app.post('/api/files/delete', (req, res) => {
+app.delete('/api/chat/history/:sessionId', async (
+  req,
+  res
+) => {
   try {
-    const { filePath } = req.body
+    const { sessionId } = req.params
 
-    if (!filePath) {
-      return res.status(400).json({
-        error: 'filePath is required.',
+    const { error } = await supabase
+      .from('chat_messages')
+      .delete()
+      .eq('session_id', sessionId)
+
+    if (error) {
+      return res.status(500).json({
+        error: error.message,
       })
     }
 
-    const absolutePath = getSafePath(filePath)
-
-    if (!fs.existsSync(absolutePath)) {
-      return res.status(404).json({
-        error: 'File does not exist.',
-      })
-    }
-
-    const stats = fs.statSync(absolutePath)
-
-    if (!stats.isFile()) {
-      return res.status(400).json({
-        error: 'The requested path is not a file.',
-      })
-    }
-
-    fs.unlinkSync(absolutePath)
-
-    console.log(
-      `File deleted: ${absolutePath}`
-    )
-
-    return res.json({
+    res.json({
       success: true,
-      filePath,
-      absolutePath,
     })
   } catch (error) {
-    console.error(
-      'File delete error:',
-      error
-    )
-
-    return res.status(500).json({
+    res.status(500).json({
       error: error.message,
     })
   }
@@ -296,7 +299,10 @@ app.post('/api/files/delete', (req, res) => {
 
 app.post('/api/chat', async (req, res) => {
   try {
-    const { messages } = req.body
+    const {
+      messages,
+      sessionId,
+    } = req.body
 
     if (
       !Array.isArray(messages) ||
@@ -307,164 +313,104 @@ app.post('/api/chat', async (req, res) => {
       })
     }
 
-    // ----------------------------------------------
-    // FIND FILES MENTIONED BY THE USER
-    // ----------------------------------------------
-
-    const lastUserMessage =
-      [...messages]
-        .reverse()
-        .find(
-          (message) =>
-            message.role === 'user'
-        )
-
-    const userText =
-      lastUserMessage?.content || ''
-
-    let fileContext = ''
-
-    const fileMatches =
-      userText.match(
-        /(?:[\w.-]+\/)*[\w.-]+\.(?:js|jsx|ts|tsx|json|css|html|md|txt|py|java|c|cpp|cs|php|sql|yml|yaml|xml|env)/gi
-      ) || []
-
-    const uniqueFiles = [
-      ...new Set(fileMatches),
-    ]
-
-    for (const file of uniqueFiles) {
-      try {
-        const absolutePath =
-          getSafePath(file)
-
-        if (
-          fs.existsSync(absolutePath) &&
-          fs.statSync(absolutePath).isFile()
-        ) {
-          const content =
-            fs.readFileSync(
-              absolutePath,
-              'utf8'
-            )
-
-          fileContext += `
-
-CURRENT FILE: ${file}
-
-<FILE_CONTENT>
-${content}
-</FILE_CONTENT>
-
-`
-        }
-      } catch (fileError) {
-        console.log(
-          `Could not read ${file}:`,
-          fileError.message
-        )
-      }
+    if (!sessionId) {
+      return res.status(400).json({
+        error: 'sessionId is required.',
+      })
     }
 
-    // ----------------------------------------------
+    // ------------------------------------------------
+    // SAVE USER MESSAGE
+    // ------------------------------------------------
+
+    const latestMessage =
+      messages[messages.length - 1]
+
+    if (
+      latestMessage &&
+      latestMessage.role === 'user'
+    ) {
+      await saveMessage(
+        sessionId,
+        'user',
+        latestMessage.content
+      )
+    }
+
+    // ------------------------------------------------
     // SYSTEM MESSAGE
-    // ----------------------------------------------
+    // ------------------------------------------------
 
     const systemMessage = {
       role: 'system',
-
       content: `
 You are the coding assistant for this local project.
 
-PROJECT ROOT:
+Project root:
 
 C:\\Users\\user\\my-ai-app
 
-You help the user create, read, modify, replace, and delete project files.
-
 NORMAL CHAT:
 
-For normal questions, answer normally.
+Answer normally.
 
-FILE CREATION:
+FILE OPERATIONS:
 
-When the user asks you to create a new file, use:
-
-<WRITE_FILE>
-FILE_PATH: relative/path/to/file
-CONTENT:
-complete file contents
-</WRITE_FILE>
-
-FILE MODIFICATION:
-
-When the user asks you to modify an existing file, use the current file contents provided to you and return the COMPLETE modified file using:
+When the user asks you to create, modify, replace, or write a file, use EXACTLY:
 
 <WRITE_FILE>
 FILE_PATH: relative/path/to/file
 CONTENT:
-complete modified file contents
+complete file contents here
 </WRITE_FILE>
 
-FILE DELETION:
+Rules:
 
-When the user asks you to delete a file, use:
-
-<DELETE_FILE>
-FILE_PATH: relative/path/to/file
-</DELETE_FILE>
-
-RULES:
-
-1. File paths must be relative.
+1. FILE_PATH must be relative.
 2. Never use an absolute Windows path.
 3. Never write outside the project folder.
-4. When modifying a file, preserve existing functionality unless the user asks for a change.
-5. When modifying a file, return the COMPLETE file.
-6. Do not return partial code.
-7. Do not use JSON for file operations.
-8. Do not use markdown code fences inside WRITE_FILE.
-9. Do not put explanations inside WRITE_FILE.
-10. For normal questions, answer normally.
-
-${fileContext}
+4. CONTENT must contain the complete file.
+5. Do not use JSON for file operations.
+6. Do not escape quotation marks inside file contents.
+7. Do not use markdown code fences around the file.
+8. Do not put explanations inside the WRITE_FILE block.
+9. Keep the exact WRITE_FILE format.
 `,
     }
 
-    // ----------------------------------------------
+    // ------------------------------------------------
     // OPENROUTER
-    // ----------------------------------------------
+    // ------------------------------------------------
 
-    const openRouterResponse =
-      await fetch(
-        'https://openrouter.ai/api/v1/chat/completions',
-        {
-          method: 'POST',
+    const openRouterResponse = await fetch(
+      'https://openrouter.ai/api/v1/chat/completions',
+      {
+        method: 'POST',
 
-          headers: {
-            Authorization:
-              `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        headers: {
+          Authorization:
+            `Bearer ${process.env.OPENROUTER_API_KEY}`,
 
-            'Content-Type':
-              'application/json',
+          'Content-Type':
+            'application/json',
 
-            'HTTP-Referer':
-              'http://localhost:8081',
+          'HTTP-Referer':
+            'http://localhost:8081',
 
-            'X-Title':
-              'My AI App',
-          },
+          'X-Title':
+            'My AI App',
+        },
 
-          body: JSON.stringify({
-            model: 'stealth/ox-alpha',
+        body: JSON.stringify({
+          model: 'stealth/ox-alpha',
 
-            messages: [
-              systemMessage,
-              ...messages,
-            ],
-          }),
-        }
-      )
+          messages: [
+            systemMessage,
+            ...messages,
+          ],
+        }),
+      }
+    )
 
     const data =
       await openRouterResponse.json()
@@ -498,11 +444,6 @@ ${fileContext}
       data?.choices?.[0]?.text ||
       ''
 
-    console.log(
-      'AI response:',
-      rawReply
-    )
-
     if (!rawReply) {
       return res.status(502).json({
         error:
@@ -510,65 +451,14 @@ ${fileContext}
       })
     }
 
-    // ----------------------------------------------
-    // DELETE FILE
-    // ----------------------------------------------
+    console.log(
+      'AI response:',
+      rawReply
+    )
 
-    const deleteMatch =
-      rawReply.match(
-        /<DELETE_FILE>\s*FILE_PATH:\s*([^\r\n]+)\s*<\/DELETE_FILE>/i
-      )
-
-    if (deleteMatch) {
-      const filePath =
-        deleteMatch[1].trim()
-
-      try {
-        const absolutePath =
-          getSafePath(filePath)
-
-        if (
-          !fs.existsSync(absolutePath)
-        ) {
-          return res.status(404).json({
-            error:
-              'File does not exist.',
-          })
-        }
-
-        fs.unlinkSync(
-          absolutePath
-        )
-
-        console.log(
-          `AI deleted file: ${absolutePath}`
-        )
-
-        return res.json({
-          action: 'delete_file',
-          success: true,
-          filePath,
-          absolutePath,
-          reply:
-            `Deleted ${filePath}`,
-          model: data.model,
-        })
-      } catch (deleteError) {
-        console.error(
-          'Delete error:',
-          deleteError
-        )
-
-        return res.status(400).json({
-          error:
-            deleteError.message,
-        })
-      }
-    }
-
-    // ----------------------------------------------
-    // WRITE FILE
-    // ----------------------------------------------
+    // ------------------------------------------------
+    // FILE OPERATION
+    // ------------------------------------------------
 
     const writeFileMatch =
       rawReply.match(
@@ -582,62 +472,59 @@ ${fileContext}
       const content =
         writeFileMatch[2]
 
-      console.log(
-        'Requested file:',
-        filePath
+      const absolutePath =
+        getSafePath(filePath)
+
+      const directory =
+        path.dirname(
+          absolutePath
+        )
+
+      fs.mkdirSync(
+        directory,
+        {
+          recursive: true,
+        }
       )
 
-      try {
-        const absolutePath =
-          getSafePath(filePath)
+      fs.writeFileSync(
+        absolutePath,
+        content,
+        'utf8'
+      )
 
-        const directory =
-          path.dirname(
-            absolutePath
-          )
+      console.log(
+        `AI wrote file: ${absolutePath}`
+      )
 
-        fs.mkdirSync(
-          directory,
-          {
-            recursive: true,
-          }
-        )
+      const reply =
+        `Created ${filePath}`
 
-        fs.writeFileSync(
-          absolutePath,
-          content,
-          'utf8'
-        )
+      await saveMessage(
+        sessionId,
+        'assistant',
+        reply
+      )
 
-        console.log(
-          `AI wrote file: ${absolutePath}`
-        )
-
-        return res.json({
-          action: 'write_file',
-          success: true,
-          filePath,
-          absolutePath,
-          reply:
-            `Updated ${filePath}`,
-          model: data.model,
-        })
-      } catch (fileError) {
-        console.error(
-          'File operation error:',
-          fileError
-        )
-
-        return res.status(400).json({
-          error:
-            fileError.message,
-        })
-      }
+      return res.json({
+        action: 'write_file',
+        success: true,
+        filePath,
+        absolutePath,
+        reply,
+        model: data.model,
+      })
     }
 
-    // ----------------------------------------------
+    // ------------------------------------------------
     // NORMAL CHAT
-    // ----------------------------------------------
+    // ------------------------------------------------
+
+    await saveMessage(
+      sessionId,
+      'assistant',
+      rawReply
+    )
 
     return res.json({
       action: 'chat',
@@ -650,7 +537,7 @@ ${fileContext}
       error
     )
 
-    return res.status(500).json({
+    res.status(500).json({
       error: error.message,
     })
   }
