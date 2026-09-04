@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "SaaS Driver",
+    "slug": "saas-driver",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "plugins": [["expo-location", { "locationWhenInUsePermission": "Allow the app to use your location to receive and complete deliveries." }]],
+    "ios": { "supportsTablet": false, "infoPlist": { "NSLocationWhenInUseUsageDescription": "Used to receive and complete deliveries." } },
+    "android": { "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"] }
+  }
+}

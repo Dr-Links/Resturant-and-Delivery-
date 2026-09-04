@@ -1,0 +1,4 @@
+-- get_delivery_tracking(request_id): safely exposes the assigned driver's name,
+-- rating, phone, live location + the customer's own confirmation code for a
+-- delivery the caller owns. Applied live. (Customers can't read platform_drivers
+-- directly; this definer RPC is the only window, scoped to their own request.)

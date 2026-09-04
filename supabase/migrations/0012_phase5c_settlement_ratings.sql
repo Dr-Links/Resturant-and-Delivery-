@@ -1,0 +1,12 @@
+-- Money layer (applied live; full bodies in migration history):
+--   delivery_payments      one row per completed delivery
+--   driver_ledger          cash commissions owed (+) and settlements (-)
+--   driver_settlements     driver mobile-money settlements (gateway call STUBBED)
+--   driver_ratings         SaaS driver ratings; updates platform_drivers.rating_avg
+--   platform_config        + cash_owed_limit, warn_threshold
+--   driver_balance()       net owed to platform
+--   trg_delivery_delivered on 'delivered': record payment; on cash, book commission
+--   settle_driver_balance()  driver clears owed balance via momo
+--   rate_driver()            customer rates driver, refreshes average
+--   offer_next_driver()/respond_to_offer()  now gate on owed balance (warn->restrict->suspend, §38)
+-- NOTE: MTN/Orange payout call in settle_driver_balance() is a stub pending merchant credentials.

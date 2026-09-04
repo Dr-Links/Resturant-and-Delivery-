@@ -1,0 +1,7 @@
+-- In-app notifications (applied live). notify() helper (internal-only) + triggers:
+--   new order        -> restaurant owner + active staff
+--   delivery offer   -> the offered driver
+--   delivery status  -> the customer
+--   KYC decision     -> the driver
+-- Recipients read/update only their own rows (existing notifications RLS).
+-- Email/SMS fan-out is a future add-on (needs a provider); in-app works now.

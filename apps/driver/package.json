@@ -1,0 +1,18 @@
+{
+  "name": "driver-app",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "private": true,
+  "scripts": { "start": "expo start", "android": "expo start --android", "ios": "expo start --ios" },
+  "dependencies": {
+    "expo": "~51.0.28",
+    "expo-status-bar": "~1.12.1",
+    "expo-location": "~17.0.1",
+    "react": "18.2.0",
+    "react-native": "0.74.5",
+    "@supabase/supabase-js": "^2.45.4",
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "react-native-url-polyfill": "^2.0.0"
+  },
+  "devDependencies": { "@babel/core": "^7.24.0", "typescript": "~5.3.3", "@types/react": "~18.2.79" }
+}

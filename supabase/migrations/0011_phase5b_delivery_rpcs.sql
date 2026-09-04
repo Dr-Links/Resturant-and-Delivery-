@@ -1,0 +1,9 @@
+-- Delivery lifecycle logic (applied live; full bodies in migration history):
+--   platform_config          admin-configurable base_fee / per_km / commission_rate / offer_timeout
+--   km_between()             haversine distance
+--   create_delivery_request  quotes price+ETA, generates 4-digit code, starts search
+--   offer_next_driver        nearest active+online+subscribed+free driver, decline->next escalation
+--   respond_to_offer         driver accept/decline; accept requires active subscription (§26)
+--   driver_update_location   GPS ping + tracking row for the active delivery
+--   update_delivery_status   assigned driver advances arriving/picked_up/in_transit/arrived
+--   verify_delivery_code     driver submits customer's code -> delivered + proof (driver never reads code)
