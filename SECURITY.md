@@ -24,6 +24,10 @@
   verified change.
 - **Leaked-password protection**: enable HaveIBeenPwned checks in
   Supabase Auth settings (one toggle, no code).
+- **`notify-fanout` edge function** runs with `verify_jwt = false` so the
+  database (`pg_net`) can invoke it directly; it authenticates each call with a
+  shared token in `public.app_settings` (RLS-locked, service-role only). Rotate
+  the token by updating `app_settings.notify_token`.
 - **`citext` in public schema**: cosmetic linter note; safe to leave.
 
 ## Operational

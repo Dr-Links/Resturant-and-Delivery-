@@ -50,3 +50,19 @@ settlement. See `.env.example` for all keys.
   `/api/pay/webhook/:provider` reconciles via `mark_order_payment`.
 - Driver settlement: `POST /api/driver/settle` collects owed commission by MoMo,
   then records via `settle_driver_balance`.
+
+## Notifications: email / SMS fan-out (Phase 7 completion)
+In-app notifications (migration 0016) now also fan out to email + SMS. On every
+`notifications` insert, a trigger calls the `notify-fanout` edge function via
+`pg_net`; it looks up the recipient's `profiles.email` / `profiles.phone` and
+sends via Resend (email) + Twilio (SMS), writing `email_status` / `sms_status`
+back on the row.
+
+- **Mock mode (default):** with no provider secrets, statuses record `mock` /
+  `skipped`, so the pipeline is verifiable without credentials.
+- **Go live** by setting Supabase edge-function secrets (not Vercel env):
+  ```
+  supabase secrets set RESEND_API_KEY=... RESEND_FROM="Chez Marie <no-reply@yourdomain>" \
+    TWILIO_ACCOUNT_SID=... TWILIO_AUTH_TOKEN=... TWILIO_FROM=+1...
+  ```
+- Redeploy the function after changing its code: `supabase functions deploy notify-fanout --no-verify-jwt`.
