@@ -1,0 +1,152 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { money } from '@/lib/format';
+
+type Provider = 'mtn' | 'orange';
+type Phase = 'choose' | 'processing' | 'paid' | 'failed';
+
+interface PayOrderProps {
+  orderId: string;
+  orderNumber: number;
+  amount: number;
+  currency: string;
+  onPaid: () => void;
+  onPayLater: () => void;
+}
+
+const POLL_INTERVAL_MS = 3000;
+const POLL_TIMEOUT_MS = 120_000;
+
+export function PayOrder({ orderId, orderNumber, amount, currency, onPaid, onPayLater }: PayOrderProps) {
+  const [provider, setProvider] = useState<Provider>('mtn');
+  const [phone, setPhone] = useState('');
+  const [phase, setPhase] = useState<Phase>('choose');
+  const [error, setError] = useState<string | null>(null);
+  const externalRef = useRef<string | null>(null);
+  const startedAt = useRef<number>(0);
+
+  const poll = useCallback(async () => {
+    if (!externalRef.current) return;
+    if (Date.now() - startedAt.current > POLL_TIMEOUT_MS) {
+      setPhase('failed');
+      setError('Payment timed out. Please try again.');
+      return;
+    }
+    try {
+      const res = await fetch(`/api/pay/status?ref=${externalRef.current}`);
+      const data = (await res.json()) as { status?: string };
+      if (data.status === 'succeeded') {
+        setPhase('paid');
+        return;
+      }
+      if (data.status === 'failed' || data.status === 'cancelled') {
+        setPhase('failed');
+        setError('The payment did not go through.');
+        return;
+      }
+    } catch {
+      // transient — keep polling
+    }
+    setTimeout(poll, POLL_INTERVAL_MS);
+  }, []);
+
+  useEffect(() => {
+    if (phase === 'paid') onPaid();
+  }, [phase, onPaid]);
+
+  async function pay() {
+    setError(null);
+    if (provider === 'mtn' && phone.trim().length < 6) {
+      setError('Enter the phone number to receive the payment prompt.');
+      return;
+    }
+    setPhase('processing');
+    try {
+      const res = await fetch('/api/pay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, provider, phone: phone.trim() || undefined }),
+      });
+      const data = (await res.json()) as { externalRef?: string; redirectUrl?: string | null; error?: string };
+      if (!res.ok || data.error || !data.externalRef) {
+        setPhase('failed');
+        setError('Could not start the payment. Please try again.');
+        return;
+      }
+      if (data.redirectUrl) {
+        window.location.href = data.redirectUrl;
+        return;
+      }
+      externalRef.current = data.externalRef;
+      startedAt.current = Date.now();
+      setTimeout(poll, POLL_INTERVAL_MS);
+    } catch {
+      setPhase('failed');
+      setError('Network error. Please try again.');
+    }
+  }
+
+  return (
+    <main className="min-h-screen px-5 py-8 max-w-md mx-auto">
+      <div className="text-center">
+        <h1 className="text-2xl font-bold">Pay for order #{orderNumber}</h1>
+        <p className="mt-1 text-brand text-3xl font-bold">{money(amount, currency)}</p>
+      </div>
+
+      {phase === 'processing' && (
+        <div className="mt-8 rounded-2xl border border-line bg-card p-6 text-center">
+          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-line border-t-brand" />
+          <p className="mt-4 font-semibold">Waiting for confirmation…</p>
+          <p className="text-sm text-muted mt-1">
+            {provider === 'mtn' ? 'Approve the prompt on your phone.' : 'Complete the payment, then return here.'}
+          </p>
+        </div>
+      )}
+
+      {phase === 'paid' && (
+        <div className="mt-8 rounded-2xl border border-brand bg-card p-6 text-center">
+          <div className="mx-auto h-12 w-12 rounded-full bg-brand/15 border border-brand flex items-center justify-center text-brand text-2xl">✓</div>
+          <p className="mt-3 font-semibold">Payment received</p>
+        </div>
+      )}
+
+      {(phase === 'choose' || phase === 'failed') && (
+        <div className="mt-8 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            {(['mtn', 'orange'] as const).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setProvider(p)}
+                className={
+                  'rounded-2xl border px-4 py-4 font-semibold ' +
+                  (provider === p ? 'border-brand bg-brand/10 text-brand' : 'border-line bg-card')
+                }
+              >
+                {p === 'mtn' ? 'MTN MoMo' : 'Orange Money'}
+              </button>
+            ))}
+          </div>
+
+          <input
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            inputMode="tel"
+            placeholder="Mobile money number (e.g. 6XXXXXXXX)"
+            className="w-full rounded-xl bg-ink border border-line px-4 py-3 outline-none focus:border-brand"
+          />
+
+          {error && <p className="text-sm text-red-400">{error}</p>}
+
+          <button onClick={pay} className="w-full rounded-full bg-brand text-black py-4 font-semibold">
+            Pay {money(amount, currency)}
+          </button>
+          <button onClick={onPayLater} className="w-full rounded-full border border-line py-3 text-sm text-muted">
+            Pay at the counter instead
+          </button>
+        </div>
+      )}
+    </main>
+  );
+}

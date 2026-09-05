@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { money } from '@/lib/format';
 import { ARViewer } from '@/components/ar-viewer';
+import { PayOrder } from '@/components/pay-order';
 import { logEvent } from '@/lib/analytics';
 import type { MenuItem } from '@/app/t/[token]/page';
 
@@ -39,6 +40,7 @@ export function MenuClient({
   const [openItem, setOpenItem] = useState<MenuItem | null>(null);
   const [placing, setPlacing] = useState(false);
   const [placed, setPlaced] = useState<{ number: number; total: number } | null>(null);
+  const [payment, setPayment] = useState<{ orderId: string; number: number; total: number } | null>(null);
 
   // post-order engagement state
   const [foodStars, setFoodStars] = useState(0);
@@ -75,10 +77,10 @@ export function MenuClient({
     const { data, error } = await supabase.rpc('place_order', { p_session_id: session.id, p_items });
     setPlacing(false);
     if (error || !data || (data as any).error) { alert('Could not place the order. Please try again or ask a waiter.'); return; }
-    const res = data as { order_number: number; subtotal: number };
+    const res = data as { order_id: string; order_number: number; subtotal: number };
     p_items.forEach((pi) => logEvent(restaurant.id, pi.menu_item_id, 'order', session.id));
-    setPlaced({ number: res.order_number, total: res.subtotal });
     setCart({});
+    setPayment({ orderId: res.order_id, number: res.order_number, total: res.subtotal });
   }
 
   async function rateFood(n: number) {
@@ -96,6 +98,19 @@ export function MenuClient({
     await supabase.rpc('submit_suggestion', { p_restaurant_id: restaurant.id, p_body: suggestion });
     setSuggestion('');
     setSuggestionSent(true);
+  }
+
+  if (payment) {
+    return (
+      <PayOrder
+        orderId={payment.orderId}
+        orderNumber={payment.number}
+        amount={payment.total}
+        currency={cur}
+        onPaid={() => { setPlaced({ number: payment.number, total: payment.total }); setPayment(null); }}
+        onPayLater={() => { setPlaced({ number: payment.number, total: payment.total }); setPayment(null); }}
+      />
+    );
   }
 
   if (placed) {

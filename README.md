@@ -35,3 +35,18 @@ end-to-end incl. RLS data isolation.
 
 ## AI assistant (Phase 6)
 Set `ANTHROPIC_API_KEY` (and optionally `ANTHROPIC_MODEL`) in Vercel to enable the dashboard AI assistant. The confirm-before-apply gate works without it; only the language model needs the key.
+
+## Payments (Phase 8)
+Mobile-money checkout (MTN MoMo / Orange Money) for food orders, plus driver
+settlement. See `.env.example` for all keys.
+
+- **Mock mode (default):** with no MTN/Orange keys set, payments run end-to-end
+  and auto-confirm after `MOCK_PAY_DELAY_MS`, so the flow is fully testable.
+- **Confirmation requires `SUPABASE_SERVICE_ROLE_KEY`** in Vercel — `mark_order_payment`
+  is service-role only, so the status/webhook routes need it to settle a payment
+  and flip the order to `paid`. Opening an intent works without it.
+- Flow: customer places order → `/api/pay` opens an intent (`create_order_payment`,
+  amount computed server-side) → gateway collects → `/api/pay/status` (poll) or
+  `/api/pay/webhook/:provider` reconciles via `mark_order_payment`.
+- Driver settlement: `POST /api/driver/settle` collects owed commission by MoMo,
+  then records via `settle_driver_balance`.
