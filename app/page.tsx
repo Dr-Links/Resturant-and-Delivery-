@@ -21,7 +21,7 @@ export default function Landing() {
             Open Table 8 (demo)
           </Link>
         </div>
-        <p className="text-xs text-muted pt-6">Need a courier? <Link href="/delivery" className="text-brand underline">Send a delivery</Link> · Staff? <Link href="/login" className="text-brand underline">Dashboard</Link></p>
+        <p className="text-xs text-muted pt-6">Need a courier? <Link href="/delivery" className="text-brand underline">Send a delivery</Link> · Driver? <Link href="/driver" className="text-brand underline">Driver dashboard</Link> · Staff? <Link href="/login" className="text-brand underline">Dashboard</Link></p>
       </div>
       <footer className="px-6 py-6 text-center text-xs text-muted border-t border-line">
         Restaurant Experience Platform · Phase 1 preview
