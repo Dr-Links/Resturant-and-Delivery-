@@ -13,6 +13,7 @@ in `apps/driver/` (Expo). Run it with `cd apps/driver && npm install && npx expo
 ```bash
 npm install
 npm run dev
+npm test        # Vitest unit tests (payments providers + notification fan-out logic)
 ```
 Set env (optional; public fallbacks are baked in):
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.

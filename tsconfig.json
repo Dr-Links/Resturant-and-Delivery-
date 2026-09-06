@@ -17,5 +17,5 @@
     "paths": { "@/*": ["./*"] }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "model-viewer.d.ts"],
-  "exclude": ["node_modules", "apps", "supabase"]
+  "exclude": ["node_modules", "apps", "supabase", "**/*.test.ts", "**/*.test.tsx", "vitest.config.ts"]
 }
