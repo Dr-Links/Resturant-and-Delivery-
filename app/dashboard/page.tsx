@@ -49,8 +49,9 @@ export default async function Overview() {
         ))}
       </div>
       <p className="mt-6 text-sm text-muted">
-        Live incoming orders are on the <span className="text-white">Orders</span> tab. Deeper analytics (food conversion,
-        AR engagement, feedback) arrive in Phase 3.
+        Live incoming orders are on the <span className="text-white">Orders</span> tab. Food conversion and AR engagement
+        are on <span className="text-white">Analytics</span>; ratings and reviews are on{' '}
+        <span className="text-white">Feedback</span>.
       </p>
     </div>
   );

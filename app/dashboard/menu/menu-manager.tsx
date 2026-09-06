@@ -84,8 +84,9 @@ export function MenuManager({
         ))}
       </div>
       <p className="mt-4 text-xs text-muted">
-        Prices and availability update the live customer menu instantly. Full item editor (photos, 3D models, variants)
-        comes with the AR upload flow in Phase 2.
+        Prices and availability update the live customer menu instantly. Use{' '}
+        <span className="text-white">Manage 3D / AR</span> on any dish to upload GLB/USDZ models and publish them to
+        customers.
       </p>
     </div>
   );
