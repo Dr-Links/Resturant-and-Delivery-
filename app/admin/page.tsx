@@ -116,16 +116,23 @@ export default async function AdminOverview() {
         ) : (
           <div className="space-y-2">
             {dlist.map((d) => (
-              <div key={d.id} className="rounded-2xl border border-line bg-card p-4 flex flex-wrap items-center gap-3">
-                <div className="flex-1 min-w-[180px]">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold">{who(d.profile)}</p>
-                    <span className={badge(d.status)}>{d.status}</span>
-                    {d.is_online && <span className="text-brand text-xs">● online</span>}
+              <Link
+                key={d.id}
+                href={`/admin/drivers/${d.id}`}
+                className="block rounded-2xl border border-line bg-card p-4 transition-colors hover:border-brand/60"
+              >
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex-1 min-w-[180px]">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold">{who(d.profile)}</p>
+                      <span className={badge(d.status)}>{d.status}</span>
+                      {d.is_online && <span className="text-brand text-xs">● online</span>}
+                    </div>
+                    <p className="text-xs text-muted mt-0.5">{d.vehicle ?? 'No vehicle'} · ★{d.rating_avg} ({d.rating_count}) · since {fmtDate(d.created_at)}</p>
                   </div>
-                  <p className="text-xs text-muted mt-0.5">{d.vehicle ?? 'No vehicle'} · ★{d.rating_avg} ({d.rating_count}) · since {fmtDate(d.created_at)}</p>
+                  <span className="text-muted text-sm">→</span>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}
