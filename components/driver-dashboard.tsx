@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { money } from '@/lib/format';
+import { DriverOnboarding } from './driver-onboarding';
 
 type Driver = { id: string; status: string; rating_avg: number | null; rating_count: number | null };
 type View = 'loading' | 'signedout' | 'notdriver' | 'ready';
@@ -12,6 +13,7 @@ export function DriverDashboard() {
 
   const [view, setView] = useState<View>('loading');
   const [driver, setDriver] = useState<Driver | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [balance, setBalance] = useState(0);
 
   // sign-in
@@ -29,6 +31,7 @@ export function DriverDashboard() {
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setView('signedout'); return; }
+    setUserId(user.id);
     const { data: d } = await supabase
       .from('platform_drivers')
       .select('id, status, rating_avg, rating_count')
@@ -107,13 +110,11 @@ export function DriverDashboard() {
   }
 
   if (view === 'notdriver') {
-    return (
-      <main className="min-h-screen flex items-center justify-center px-6 text-center">
-        <div className="max-w-sm">
-          <h1 className="text-2xl font-bold">Not a driver account</h1>
-          <p className="mt-2 text-muted">This account isn’t registered as a platform driver.</p>
-          <button onClick={signOut} className="mt-5 rounded-full border border-line px-5 py-2 text-sm">Sign out</button>
-        </div>
+    return userId ? (
+      <DriverOnboarding userId={userId} onDone={() => { setView('loading'); load(); }} onSignOut={signOut} />
+    ) : (
+      <main className="min-h-screen flex items-center justify-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-line border-t-brand" />
       </main>
     );
   }
@@ -127,6 +128,12 @@ export function DriverDashboard() {
         </div>
         <button onClick={signOut} className="text-xs text-muted">Sign out</button>
       </div>
+
+      {driver && driver.status !== 'active' && (
+        <div className="mt-4 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-200">
+          Your KYC is <span className="font-semibold capitalize">{driver.status}</span>. You’ll be able to accept deliveries once an admin approves your account.
+        </div>
+      )}
 
       <section className="mt-6 rounded-2xl border border-line bg-card p-5">
         <p className="text-sm text-muted">Owed to platform</p>
