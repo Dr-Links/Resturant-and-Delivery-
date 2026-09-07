@@ -43,12 +43,35 @@ export function DeliveryClient({ userEmail, active, past, addresses }: {
     navigator.geolocation?.getCurrentPosition((pos) => { setPLat(pos.coords.latitude); setPLng(pos.coords.longitude); if (!pickup) setPickup('My current location'); });
   }
 
+  async function geocode(address: string): Promise<{ lat: number | null; lng: number | null }> {
+    try {
+      const r = await fetch('/api/geocode', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ address }),
+      });
+      if (!r.ok) return { lat: null, lng: null };
+      const j = (await r.json()) as { lat: number | null; lng: number | null };
+      return { lat: j.lat ?? null, lng: j.lng ?? null };
+    } catch {
+      return { lat: null, lng: null };
+    }
+  }
+
   async function createRequest() {
     if (!pickup || !dest || busy) return;
     setBusy(true); setErr(null);
+
+    // Geocode the destination (always) and the pickup when it was typed rather
+    // than captured from the device. Failures fall back to null coordinates.
+    const destCoords = await geocode(dest);
+    let plat = pLat, plng = pLng;
+    if ((plat == null || plng == null) && pickup && pickup !== 'My current location') {
+      const g = await geocode(pickup);
+      plat = g.lat; plng = g.lng;
+    }
+
     const { data, error } = await supabase.rpc('create_delivery_request', {
-      p_pickup_address: pickup, p_pickup_lat: pLat, p_pickup_lng: pLng,
-      p_dest_address: dest, p_dest_lat: null, p_dest_lng: null,
+      p_pickup_address: pickup, p_pickup_lat: plat, p_pickup_lng: plng,
+      p_dest_address: dest, p_dest_lat: destCoords.lat, p_dest_lng: destCoords.lng,
       p_item_type: itemType, p_package_info: info || null, p_package_photo_url: null,
       p_special_instructions: notes || null, p_payment_method: pay, p_restaurant_id: null, p_order_id: null,
     });
