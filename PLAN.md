@@ -108,12 +108,12 @@ Plus an **Expo/React Native driver app** (`apps/driver/`) for independent driver
 
 These are secrets **you** set; the code is done and waits for them.
 
-1. **`SUPABASE_SERVICE_ROLE_KEY` in Vercel** — the single highest-leverage unlock. It
-   lets the server decrypt Vault secrets and use the service role, activating:
-   payment confirmation/settlement, KYC signed-URL document viewing, and Google
-   geocoding — all reading from dashboard-managed keys.
+1. ~~**`SUPABASE_SERVICE_ROLE_KEY` in Vercel**~~ — ✅ **DONE (2026-09-07).** Verified live:
+   the service-role-gated endpoints flipped from `503 payments_not_configured` to
+   normal behaviour. This activated payment confirmation/settlement, KYC signed-URL
+   document viewing, and server-side Google-key decryption.
 2. **Enter real payment credentials** under `/admin/integrations` (MTN and/or Orange).
-   Takes effect with no redeploy.
+   Takes effect with no redeploy. ← **next**
 3. **Enter the Google Maps API key** under `/admin/integrations` (restrict it in Google
    Cloud Console). Enables geocoding → accurate delivery pins.
 4. **Notification secrets** (Supabase edge-function secrets, not Vercel env):
