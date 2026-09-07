@@ -1,5 +1,6 @@
 import { getServerSupabase } from '@/lib/supabase/server';
 import { getActiveRestaurant } from '@/lib/dashboard';
+import { loadIntegration } from '@/lib/integrations/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,15 +28,17 @@ export async function POST(req: Request) {
     supabase.rpc('get_food_funnel', { p_restaurant_id: restaurant.id }),
   ]);
 
-  const key = process.env.ANTHROPIC_API_KEY;
+  // Credentials come from the dashboard integration store (Vault), env fallback.
+  const cfg = await loadIntegration('anthropic');
+  const key = cfg('ANTHROPIC_API_KEY');
   if (!key) {
     return Response.json({
-      answer: 'The AI assistant is not configured yet. Add an ANTHROPIC_API_KEY environment variable in Vercel to enable it. (The confirm-before-apply flow is already wired up.)',
+      answer: 'The AI assistant is not configured yet. Add an Anthropic API key under Admin → Integrations to enable it. (The confirm-before-apply flow is already wired up.)',
       proposal: null, action_id: null,
     });
   }
 
-  const model = process.env.ANTHROPIC_MODEL ?? 'claude-3-5-sonnet-latest';
+  const model = cfg('ANTHROPIC_MODEL', 'claude-sonnet-4-6');
   const context = JSON.stringify({ restaurant: { name: restaurant.name, currency: restaurant.currency }, categories, items, funnel });
 
   let answer = ''; let proposal: any = null;

@@ -13,8 +13,10 @@ type Setting = {
 };
 type Provider = { key: string; label: string; category: string; enabled: boolean; settings: Setting[] };
 
-const CATEGORY_ORDER = ['payments', 'maps', 'other'];
-const CATEGORY_LABEL: Record<string, string> = { payments: 'Payments', maps: 'Maps', other: 'Other integrations' };
+const CATEGORY_ORDER = ['payments', 'maps', 'ai', 'notifications', 'other'];
+const CATEGORY_LABEL: Record<string, string> = {
+  payments: 'Payments', maps: 'Maps', ai: 'AI', notifications: 'Notifications', other: 'Other integrations',
+};
 
 export function IntegrationsManager({ initial }: { initial: Provider[] }) {
   const supabase = createClient();
@@ -203,6 +205,8 @@ function AddProvider({ onDone }: { onDone: () => void }) {
       <select value={category} onChange={(e) => setCategory(e.target.value)} className="rounded-lg bg-ink border border-line px-3 py-2 text-sm outline-none focus:border-brand">
         <option value="payments">Payments</option>
         <option value="maps">Maps</option>
+        <option value="ai">AI</option>
+        <option value="notifications">Notifications</option>
         <option value="other">Other</option>
       </select>
       <button onClick={add} disabled={busy} className="rounded-full bg-brand text-black px-4 py-2 text-sm font-semibold disabled:opacity-50">Create</button>

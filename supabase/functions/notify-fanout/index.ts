@@ -3,40 +3,48 @@
 // shared token (stored in app_settings) since the function runs with
 // verify_jwt = false so the database can call it directly.
 //
-// Runs in MOCK mode when no provider keys are set: it records email_status /
-// sms_status = 'mock' so the whole pipeline is verifiable without credentials.
-// Set secrets to go live:  supabase secrets set RESEND_API_KEY=... RESEND_FROM=...
-//                          TWILIO_ACCOUNT_SID=... TWILIO_AUTH_TOKEN=... TWILIO_FROM=...
+// Provider credentials are read from the dashboard-managed integration store
+// (get_integration_config, service-role only), falling back to Deno.env secrets.
+// Runs in MOCK mode when neither is set: records email_status / sms_status =
+// 'mock' so the whole pipeline is verifiable without credentials.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "jsr:@supabase/supabase-js@2";
 import { alreadyDispatched, isAuthorized, planEmail, planSms, planToStatus, sendResultStatus } from "./logic.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const RESEND_FROM = Deno.env.get("RESEND_FROM") ?? "Chez Marie <onboarding@resend.dev>";
-const TWILIO_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
-const TWILIO_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
-const TWILIO_FROM = Deno.env.get("TWILIO_FROM");
+type ResendCfg = { apiKey?: string; from: string };
+type TwilioCfg = { sid?: string; token?: string; from?: string };
 
-async function sendEmail(to: string, subject: string, text: string): Promise<string> {
+// Read a provider's config from the integration store (Vault-decrypted), then
+// fall back to Deno.env for any missing key.
+async function loadStore(admin: SupabaseClient, provider: string): Promise<Record<string, string>> {
+  try {
+    const { data } = await admin.rpc("get_integration_config", { p_provider: provider });
+    return (data && typeof data === "object") ? data as Record<string, string> : {};
+  } catch {
+    return {};
+  }
+}
+
+async function sendEmail(cfg: ResendCfg, to: string, subject: string, text: string): Promise<string> {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
-    headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: RESEND_FROM, to, subject, text }),
+    headers: { Authorization: `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from: cfg.from, to, subject, text }),
   });
   return sendResultStatus(res.ok, res.status);
 }
 
-async function sendSms(to: string, body: string): Promise<string> {
-  const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`, {
+async function sendSms(cfg: TwilioCfg, to: string, body: string): Promise<string> {
+  const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${cfg.sid}/Messages.json`, {
     method: "POST",
     headers: {
-      Authorization: "Basic " + btoa(`${TWILIO_SID}:${TWILIO_TOKEN}`),
+      Authorization: "Basic " + btoa(`${cfg.sid}:${cfg.token}`),
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: new URLSearchParams({ To: to, From: TWILIO_FROM!, Body: body }),
+    body: new URLSearchParams({ To: to, From: cfg.from!, Body: body }),
   });
   return sendResultStatus(res.ok, res.status);
 }
@@ -66,6 +74,18 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ ok: true, idempotent: true }));
   }
 
+  // Resolve provider credentials: dashboard store first, then Deno.env.
+  const [resendStore, twilioStore] = await Promise.all([loadStore(admin, "resend"), loadStore(admin, "twilio")]);
+  const resend: ResendCfg = {
+    apiKey: resendStore.RESEND_API_KEY || Deno.env.get("RESEND_API_KEY") || undefined,
+    from: resendStore.RESEND_FROM || Deno.env.get("RESEND_FROM") || "Chez Marie <onboarding@resend.dev>",
+  };
+  const twilio: TwilioCfg = {
+    sid: twilioStore.TWILIO_ACCOUNT_SID || Deno.env.get("TWILIO_ACCOUNT_SID") || undefined,
+    token: twilioStore.TWILIO_AUTH_TOKEN || Deno.env.get("TWILIO_AUTH_TOKEN") || undefined,
+    from: twilioStore.TWILIO_FROM || Deno.env.get("TWILIO_FROM") || undefined,
+  };
+
   const { data: profile } = await admin
     .from("profiles")
     .select("email, phone")
@@ -75,11 +95,11 @@ Deno.serve(async (req) => {
   const subject = n.title ?? "Notification";
   const text = n.body ?? "";
 
-  const emailPlan = planEmail(profile?.email, Boolean(RESEND_API_KEY));
-  const smsPlan = planSms(profile?.phone, Boolean(TWILIO_SID && TWILIO_TOKEN && TWILIO_FROM));
+  const emailPlan = planEmail(profile?.email, Boolean(resend.apiKey));
+  const smsPlan = planSms(profile?.phone, Boolean(twilio.sid && twilio.token && twilio.from));
 
-  const emailStatus = emailPlan === "send" ? await sendEmail(profile!.email!, subject, text) : planToStatus(emailPlan);
-  const smsStatus = smsPlan === "send" ? await sendSms(profile!.phone!, `${subject}: ${text}`) : planToStatus(smsPlan);
+  const emailStatus = emailPlan === "send" ? await sendEmail(resend, profile!.email!, subject, text) : planToStatus(emailPlan);
+  const smsStatus = smsPlan === "send" ? await sendSms(twilio, profile!.phone!, `${subject}: ${text}`) : planToStatus(smsPlan);
 
   await admin.from("notifications").update({ email_status: emailStatus, sms_status: smsStatus }).eq("id", n.id);
 
