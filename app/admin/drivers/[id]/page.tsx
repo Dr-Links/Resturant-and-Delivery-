@@ -1,8 +1,21 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { getServerSupabase } from '@/lib/supabase/server';
 import { money } from '@/lib/format';
 export const dynamic = 'force-dynamic';
+
+const KYC_BUCKET = 'kyc';
+const SIGNED_URL_TTL_SECONDS = 600; // 10 minutes
+
+// driver_kyc.*_url columns hold the private-bucket object path; mint a
+// short-lived signed URL for it (admin has read via the "kyc admin read"
+// storage policy). Returns null if there is no path or signing fails.
+async function signKycDoc(supabase: SupabaseClient, path: string | null): Promise<string | null> {
+  if (!path) return null;
+  const { data } = await supabase.storage.from(KYC_BUCKET).createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+  return data?.signedUrl ?? null;
+}
 
 type ProfileRef = { full_name: string | null; email: string | null; phone: string | null } | null;
 type Driver = {
@@ -36,10 +49,12 @@ function who(p: ProfileRef) {
   return p?.full_name || p?.email || 'Unknown driver';
 }
 
-// KYC documents are sensitive PII; only rendered on this admin-gated page and
-// opened in a new tab with noopener. Stored as full URLs (*_url columns).
-function DocLink({ label, url }: { label: string; url: string | null }) {
-  if (!url) return <span className="rounded-full border border-line px-3 py-1 text-xs text-muted">{label}: Not provided</span>;
+// KYC documents are sensitive PII: private bucket + short-lived signed URL,
+// rendered only on this admin-gated page, opened in a new tab with noopener.
+// `path` is the stored object path; `url` is the minted signed URL.
+function DocLink({ label, path, url }: { label: string; path: string | null; url: string | null }) {
+  if (!path) return <span className="rounded-full border border-line px-3 py-1 text-xs text-muted">{label}: Not provided</span>;
+  if (!url) return <span className="rounded-full border border-line px-3 py-1 text-xs text-muted">{label}: Unavailable</span>;
   return (
     <a href={url} target="_blank" rel="noopener noreferrer" className="rounded-full border border-brand/50 bg-brand/10 px-3 py-1 text-xs text-brand hover:underline">
       {label} ↗
@@ -66,6 +81,15 @@ export default async function AdminDriverDetail({ params }: { params: { id: stri
   ]);
   const kyc = kycRes.data as Kyc;
   const sub = subRes.data as Sub;
+
+  // Mint signed URLs for KYC docs from the private bucket (paths in *_url cols).
+  const [idDocUrl, licenseUrl, selfieUrl] = kyc
+    ? await Promise.all([
+        signKycDoc(supabase, kyc.id_doc_url),
+        signKycDoc(supabase, kyc.license_url),
+        signKycDoc(supabase, kyc.selfie_url),
+      ])
+    : [null, null, null];
   const s = (statRes.data as StatRow[] | null)?.[0] ?? { total_deliveries: 0, completed_deliveries: 0, total_earnings: 0 };
 
   const stats = [
@@ -130,9 +154,9 @@ export default async function AdminDriverDetail({ params }: { params: { id: stri
               </dl>
               <p className="text-xs text-muted mt-3 mb-1.5">Documents</p>
               <div className="flex flex-wrap gap-2">
-                <DocLink label="ID document" url={kyc.id_doc_url} />
-                <DocLink label="Driver's license" url={kyc.license_url} />
-                <DocLink label="Selfie" url={kyc.selfie_url} />
+                <DocLink label="ID document" path={kyc.id_doc_url} url={idDocUrl} />
+                <DocLink label="Driver's license" path={kyc.license_url} url={licenseUrl} />
+                <DocLink label="Selfie" path={kyc.selfie_url} url={selfieUrl} />
               </div>
             </>
           ) : <p className="text-sm text-muted">No KYC submitted.</p>}
