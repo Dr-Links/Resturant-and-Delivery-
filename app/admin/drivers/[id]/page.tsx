@@ -10,7 +10,10 @@ type Driver = {
   rating_avg: number; rating_count: number; last_ping: string | null; created_at: string;
   profile: ProfileRef;
 };
-type Kyc = { status: string; full_name: string | null; id_number: string | null; reviewed_at: string | null } | null;
+type Kyc = {
+  status: string; full_name: string | null; id_number: string | null; reviewed_at: string | null;
+  id_doc_url: string | null; license_url: string | null; selfie_url: string | null;
+} | null;
 type Sub = { plan: string; status: string; expires_at: string | null } | null;
 type StatRow = { total_deliveries: number; completed_deliveries: number; total_earnings: number };
 
@@ -33,6 +36,17 @@ function who(p: ProfileRef) {
   return p?.full_name || p?.email || 'Unknown driver';
 }
 
+// KYC documents are sensitive PII; only rendered on this admin-gated page and
+// opened in a new tab with noopener. Stored as full URLs (*_url columns).
+function DocLink({ label, url }: { label: string; url: string | null }) {
+  if (!url) return <span className="rounded-full border border-line px-3 py-1 text-xs text-muted">{label}: Not provided</span>;
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="rounded-full border border-brand/50 bg-brand/10 px-3 py-1 text-xs text-brand hover:underline">
+      {label} ↗
+    </a>
+  );
+}
+
 export default async function AdminDriverDetail({ params }: { params: { id: string } }) {
   const supabase = getServerSupabase();
 
@@ -46,7 +60,7 @@ export default async function AdminDriverDetail({ params }: { params: { id: stri
   const d = driver as unknown as Driver;
 
   const [kycRes, subRes, statRes] = await Promise.all([
-    supabase.from('driver_kyc').select('status,full_name,id_number,reviewed_at').eq('driver_id', d.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('driver_kyc').select('status,full_name,id_number,reviewed_at,id_doc_url,license_url,selfie_url').eq('driver_id', d.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('driver_subscriptions').select('plan,status,expires_at').eq('driver_id', d.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.rpc('admin_driver_stats', { p_driver_id: d.id }),
   ]);
@@ -108,11 +122,19 @@ export default async function AdminDriverDetail({ params }: { params: { id: stri
             {kyc && <span className={badge(kyc.status)}>{kyc.status}</span>}
           </div>
           {kyc ? (
-            <dl className="text-sm space-y-1">
-              <div className="flex justify-between gap-4"><dt className="text-muted">Name</dt><dd>{kyc.full_name ?? '—'}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-muted">ID number</dt><dd>{kyc.id_number ?? '—'}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-muted">Reviewed</dt><dd>{fmtDate(kyc.reviewed_at)}</dd></div>
-            </dl>
+            <>
+              <dl className="text-sm space-y-1">
+                <div className="flex justify-between gap-4"><dt className="text-muted">Name</dt><dd>{kyc.full_name ?? '—'}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-muted">ID number</dt><dd>{kyc.id_number ?? '—'}</dd></div>
+                <div className="flex justify-between gap-4"><dt className="text-muted">Reviewed</dt><dd>{fmtDate(kyc.reviewed_at)}</dd></div>
+              </dl>
+              <p className="text-xs text-muted mt-3 mb-1.5">Documents</p>
+              <div className="flex flex-wrap gap-2">
+                <DocLink label="ID document" url={kyc.id_doc_url} />
+                <DocLink label="Driver's license" url={kyc.license_url} />
+                <DocLink label="Selfie" url={kyc.selfie_url} />
+              </div>
+            </>
           ) : <p className="text-sm text-muted">No KYC submitted.</p>}
         </div>
         <div className="rounded-2xl border border-line bg-card p-4">
