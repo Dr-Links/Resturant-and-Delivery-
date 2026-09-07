@@ -67,10 +67,12 @@ Plus an **Expo/React Native driver app** (`apps/driver/`) for independent driver
   ID/licence/selfie to the private bucket and records paths on `driver_kyc`; new
   drivers are `pending` until an admin approves (closes the loop end-to-end).
 
-## Integrations / API-key manager (✅ live) — migration `0022`
+## Integrations / API-key manager (✅ live) — migrations `0022`, `0023`
 
-`/admin/integrations` manages third-party credentials — **MTN MoMo**, **Orange Money**
-(separately + grouped), **Google Maps**, and **arbitrary custom providers**.
+`/admin/integrations` manages **every** third-party credential in one place, each
+add / delete / enable / edit: **MTN MoMo** & **Orange Money** (separately + grouped),
+**Google Maps**, **Anthropic** (AI), **Resend** + **Twilio** (notifications), and
+**arbitrary custom providers**.
 
 - **Secrets encrypted at rest in Supabase Vault**; the settings row stores only a
   `vault_secret_id`, never plaintext.
@@ -80,10 +82,12 @@ Plus an **Expo/React Native driver app** (`apps/driver/`) for independent driver
   `admin_delete_provider`).
 - **Server-only decryption** — `get_integration_config(provider)` is granted to
   `service_role` **only** (revoked from anon/authenticated).
-- **Payments consume it** — `lib/payments/resolve.ts` (server-only) builds MTN/Orange
-  credentials from the store at request time, with **env vars as fallback** (so mock
-  mode keeps working until real keys are entered). Enter keys in the dashboard → live,
-  no redeploy. `lib/payments/index.ts` stays sync/env for unit tests.
+- **Everything consumes it** — payments (`lib/payments/resolve.ts`), the AI assistant
+  route (Anthropic), geocoding (Google Maps), and the `notify-fanout` edge function
+  (Resend/Twilio, via the service-role `get_integration_config` RPC) all read
+  credentials from the store at request time, with **env vars / Supabase secrets as
+  fallback** (so mock mode keeps working until real keys are entered). Enter keys in
+  the dashboard → live, no redeploy. `lib/payments/index.ts` stays sync/env for tests.
 
 ## Maps & geocoding (✅ live)
 
@@ -106,18 +110,22 @@ Plus an **Expo/React Native driver app** (`apps/driver/`) for independent driver
 
 ## ⏳ Remaining — configuration only (no code left)
 
-These are secrets **you** set; the code is done and waits for them.
+These are secrets **you** set; the code is done and waits for them. Since the
+service-role key is in place, **everything below is entered in `/admin/integrations`
+and takes effect immediately — no redeploy, no code.**
 
 1. ~~**`SUPABASE_SERVICE_ROLE_KEY` in Vercel**~~ — ✅ **DONE (2026-09-07).** Verified live:
    the service-role-gated endpoints flipped from `503 payments_not_configured` to
    normal behaviour. This activated payment confirmation/settlement, KYC signed-URL
-   document viewing, and server-side Google-key decryption.
-2. **Enter real payment credentials** under `/admin/integrations` (MTN and/or Orange).
-   Takes effect with no redeploy. ← **next**
-3. **Enter the Google Maps API key** under `/admin/integrations` (restrict it in Google
-   Cloud Console). Enables geocoding → accurate delivery pins.
-4. **Notification secrets** (Supabase edge-function secrets, not Vercel env):
-   `supabase secrets set RESEND_API_KEY … TWILIO_ACCOUNT_SID …` to take email/SMS live.
+   document viewing, server-side Google-key decryption, and the edge function's
+   store-based credential reads.
+2. **Enter payment credentials** — MTN and/or Orange → payments go live. ← **next**
+3. **Enter the Google Maps API key** (restrict it in Google Cloud Console) → geocoding
+   → accurate delivery pins.
+4. **Enter the Anthropic API key** → the restaurant AI assistant goes live.
+5. **Enter Resend + Twilio credentials** → email/SMS notifications go live (the
+   `notify-fanout` edge function now reads them from the store; `supabase secrets set …`
+   still works as a fallback).
 
 ## Known gaps / future ideas (optional)
 
