@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAdminSupabase, hasAdmin } from '@/lib/supabase/admin';
-import { getCollectionsProvider } from '@/lib/payments';
+import { resolveCollectionsProvider } from '@/lib/payments/resolve';
 import type { ProviderName } from '@/lib/payments';
 
 export const runtime = 'nodejs';
@@ -33,7 +33,7 @@ export async function POST(req: Request, { params }: { params: { provider: strin
     .maybeSingle();
   if (!pay) return NextResponse.json({ error: 'not_found' }, { status: 404 });
 
-  const gateway = getCollectionsProvider(pay.provider as ProviderName);
+  const gateway = await resolveCollectionsProvider(pay.provider as ProviderName);
   try {
     const result = await gateway.getStatus({
       externalRef: pay.external_ref,

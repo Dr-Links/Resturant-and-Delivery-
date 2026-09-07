@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getAdminSupabase, hasAdmin } from '@/lib/supabase/admin';
-import { getCollectionsProvider } from '@/lib/payments';
+import { resolveCollectionsProvider } from '@/lib/payments/resolve';
 import type { ProviderName } from '@/lib/payments';
 
 export const runtime = 'nodejs';
@@ -34,7 +34,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ status: pay.status });
   }
 
-  const gateway = getCollectionsProvider(pay.provider as ProviderName);
+  const gateway = await resolveCollectionsProvider(pay.provider as ProviderName);
   const ageMs = Date.now() - new Date(pay.created_at).getTime();
   let result;
   try {

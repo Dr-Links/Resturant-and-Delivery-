@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { getServerSupabase } from '@/lib/supabase/server';
-import { getCollectionsProvider } from '@/lib/payments';
+import { resolveCollectionsProvider } from '@/lib/payments/resolve';
 
 export const runtime = 'nodejs';
 
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
   if (!auth.user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
 
   const externalRef = randomUUID();
-  const gateway = getCollectionsProvider(provider);
+  const gateway = await resolveCollectionsProvider(provider);
   try {
     const init = await gateway.requestToPay({
       externalRef,

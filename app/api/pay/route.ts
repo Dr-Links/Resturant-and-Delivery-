@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getServerAnon, getAdminSupabase, hasAdmin } from '@/lib/supabase/admin';
-import { getCollectionsProvider } from '@/lib/payments';
+import { resolveCollectionsProvider } from '@/lib/payments/resolve';
 
 export const runtime = 'nodejs';
 
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
 
   // 2) Ask the gateway to collect (MTN pushes a USSD prompt; Orange returns a URL).
   const origin = new URL(req.url).origin;
-  const gateway = getCollectionsProvider(provider);
+  const gateway = await resolveCollectionsProvider(provider);
   let init;
   try {
     init = await gateway.requestToPay({
