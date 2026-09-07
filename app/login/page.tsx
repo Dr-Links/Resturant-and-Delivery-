@@ -16,13 +16,25 @@ export default function LoginPage() {
     setBusy(true);
     setError(null);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setBusy(false);
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
+      setBusy(false);
       setError(error.message);
       return;
     }
-    router.push('/dashboard');
+    // Route platform admins to /admin; everyone else to the restaurant dashboard.
+    const userId = data.user?.id;
+    let destination = '/dashboard';
+    if (userId) {
+      const { data: admin } = await supabase
+        .from('platform_admins')
+        .select('profile_id')
+        .eq('profile_id', userId)
+        .maybeSingle();
+      if (admin) destination = '/admin';
+    }
+    setBusy(false);
+    router.push(destination);
     router.refresh();
   }
 
