@@ -70,9 +70,9 @@ Plus an **Expo/React Native driver app** (`apps/driver/`) for independent driver
 ## Integrations / API-key manager (✅ live) — migrations `0022`, `0023`
 
 `/admin/integrations` manages **every** third-party credential in one place, each
-add / delete / enable / edit: **MTN MoMo** & **Orange Money** (separately + grouped),
-**Google Maps**, **Anthropic** (AI), **Resend** + **Twilio** (notifications), and
-**arbitrary custom providers**.
+add / delete / enable / edit: **Fapshi** (one key → MTN + Orange), **MTN MoMo** &
+**Orange Money** direct, **Google Maps**, **Anthropic** (AI), **Resend** + **Twilio**
+(notifications), and **arbitrary custom providers**.
 
 - **Secrets encrypted at rest in Supabase Vault**; the settings row stores only a
   `vault_secret_id`, never plaintext.
@@ -102,11 +102,22 @@ add / delete / enable / edit: **MTN MoMo** & **Orange Money** (separately + grou
 
 - Intents: `create_order_payment` (anon, server-computed amount) →
   `mark_order_payment` (service-role only, idempotent, flips `orders.payment_status`).
-- Providers: MTN MoMo (collections + disbursements), Orange Money web payment, and a
-  **mock** that auto-confirms after `MOCK_PAY_DELAY_MS` when no creds are set.
+- Providers:
+  - **Fapshi** (migration `0024`) — **recommended.** A single aggregator account
+    covers **both MTN + Orange** (auto-detects the network from the phone). One
+    credential set (`FAPSHI_API_USER`, `FAPSHI_API_KEY`); it's the default option in
+    checkout. `POST /direct-pay` + `GET /payment-status/:transId`.
+  - **MTN MoMo** (collections + disbursements) and **Orange Money** — direct telco
+    integrations, for those with separate merchant accounts per network.
+  - **mock** — auto-confirms after `MOCK_PAY_DELAY_MS` when no creds are set.
 - Routes: `/api/pay`, `/api/pay/status`, `/api/pay/webhook/[provider]`,
   `/api/driver/settle` (accepts cookie **or** Bearer token, so the Expo app settles
-  through the real gateway).
+  through the real gateway). All resolve credentials from the integration store.
+
+### Fastest path to live payments
+Enter the **Fapshi** API user + key under `/admin/integrations`, enable it, and (for
+real money) set `FAPSHI_BASE_URL` to `https://live.fapshi.com`. One credential set,
+both networks, no redeploy.
 
 ## ⏳ Remaining — configuration only (no code left)
 
@@ -119,7 +130,8 @@ and takes effect immediately — no redeploy, no code.**
    normal behaviour. This activated payment confirmation/settlement, KYC signed-URL
    document viewing, server-side Google-key decryption, and the edge function's
    store-based credential reads.
-2. **Enter payment credentials** — MTN and/or Orange → payments go live. ← **next**
+2. **Enter payment credentials** → payments go live. ← **next** — easiest is **Fapshi**
+   (one API user + key covers both MTN + Orange); or MTN/Orange direct accounts.
 3. **Enter the Google Maps API key** (restrict it in Google Cloud Console) → geocoding
    → accurate delivery pins.
 4. **Enter the Anthropic API key** → the restaurant AI assistant goes live.
