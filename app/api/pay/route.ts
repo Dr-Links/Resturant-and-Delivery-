@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 
 const Body = z.object({
   orderId: z.string().uuid(),
-  provider: z.enum(['mtn', 'orange']),
+  provider: z.enum(['mtn', 'orange', 'fapshi']),
   phone: z.string().trim().min(6).max(20).optional(),
 });
 

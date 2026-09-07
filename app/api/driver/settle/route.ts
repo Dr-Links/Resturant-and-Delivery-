@@ -27,7 +27,7 @@ function clientFor(req: Request) {
 const Body = z.object({
   amount: z.number().positive(),
   phone: z.string().trim().min(6).max(20),
-  provider: z.enum(['mtn', 'orange']).default('mtn'),
+  provider: z.enum(['mtn', 'orange', 'fapshi']).default('mtn'),
 });
 
 // POST /api/driver/settle — a platform driver clears their owed commission by

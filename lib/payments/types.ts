@@ -3,7 +3,7 @@
 
 export type PaymentState = 'pending' | 'processing' | 'succeeded' | 'failed' | 'cancelled';
 
-export type ProviderName = 'mtn' | 'orange' | 'mock';
+export type ProviderName = 'mtn' | 'orange' | 'fapshi' | 'mock';
 
 export interface PaymentInitiation {
   externalRef: string; // our idempotency key (uuid), also sent to the gateway

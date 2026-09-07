@@ -3,8 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { money } from '@/lib/format';
 
-type Provider = 'mtn' | 'orange';
+type Provider = 'mtn' | 'orange' | 'fapshi';
 type Phase = 'choose' | 'processing' | 'paid' | 'failed';
+
+// Fapshi covers both MTN + Orange with one gateway (auto-detects the network),
+// so it's the default; the direct MTN/Orange options remain for direct accounts.
+const PROVIDERS: { key: Provider; label: string }[] = [
+  { key: 'fapshi', label: 'MTN / Orange' },
+  { key: 'mtn', label: 'MTN (direct)' },
+  { key: 'orange', label: 'Orange (direct)' },
+];
+const NEEDS_PHONE: Provider[] = ['mtn', 'fapshi'];
 
 interface PayOrderProps {
   orderId: string;
@@ -19,7 +28,7 @@ const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 120_000;
 
 export function PayOrder({ orderId, orderNumber, amount, currency, onPaid, onPayLater }: PayOrderProps) {
-  const [provider, setProvider] = useState<Provider>('mtn');
+  const [provider, setProvider] = useState<Provider>('fapshi');
   const [phone, setPhone] = useState('');
   const [phase, setPhase] = useState<Phase>('choose');
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +66,7 @@ export function PayOrder({ orderId, orderNumber, amount, currency, onPaid, onPay
 
   async function pay() {
     setError(null);
-    if (provider === 'mtn' && phone.trim().length < 6) {
+    if (NEEDS_PHONE.includes(provider) && phone.trim().length < 6) {
       setError('Enter the phone number to receive the payment prompt.');
       return;
     }
@@ -99,7 +108,7 @@ export function PayOrder({ orderId, orderNumber, amount, currency, onPaid, onPay
           <div className="mx-auto h-12 w-12 animate-spin rounded-full border-2 border-line border-t-brand" />
           <p className="mt-4 font-semibold">Waiting for confirmation…</p>
           <p className="text-sm text-muted mt-1">
-            {provider === 'mtn' ? 'Approve the prompt on your phone.' : 'Complete the payment, then return here.'}
+            {provider === 'orange' ? 'Complete the payment, then return here.' : 'Approve the prompt on your phone.'}
           </p>
         </div>
       )}
@@ -113,18 +122,18 @@ export function PayOrder({ orderId, orderNumber, amount, currency, onPaid, onPay
 
       {(phase === 'choose' || phase === 'failed') && (
         <div className="mt-8 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            {(['mtn', 'orange'] as const).map((p) => (
+          <div className="grid grid-cols-3 gap-2">
+            {PROVIDERS.map((p) => (
               <button
-                key={p}
+                key={p.key}
                 type="button"
-                onClick={() => setProvider(p)}
+                onClick={() => setProvider(p.key)}
                 className={
-                  'rounded-2xl border px-4 py-4 font-semibold ' +
-                  (provider === p ? 'border-brand bg-brand/10 text-brand' : 'border-line bg-card')
+                  'rounded-2xl border px-2 py-4 text-sm font-semibold ' +
+                  (provider === p.key ? 'border-brand bg-brand/10 text-brand' : 'border-line bg-card')
                 }
               >
-                {p === 'mtn' ? 'MTN MoMo' : 'Orange Money'}
+                {p.label}
               </button>
             ))}
           </div>

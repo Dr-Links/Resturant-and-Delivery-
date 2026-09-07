@@ -8,6 +8,7 @@ import { loadIntegration } from '@/lib/integrations/server';
 import { MockProvider } from './mock';
 import { MtnCollections, MtnDisbursements, mtnConfigured, mtnConfigFrom } from './mtn-momo';
 import { OrangeMoney, orangeConfigured, orangeConfigFrom } from './orange-money';
+import { FapshiCollections, fapshiConfigured, fapshiConfigFrom } from './fapshi';
 import type { CollectionsProvider, DisbursementProvider, ProviderName } from './types';
 
 export async function resolveCollectionsProvider(requested: ProviderName): Promise<CollectionsProvider> {
@@ -18,6 +19,10 @@ export async function resolveCollectionsProvider(requested: ProviderName): Promi
   if (requested === 'orange') {
     const c = orangeConfigFrom(await loadIntegration('orange_money'));
     if (orangeConfigured(c)) return new OrangeMoney(c);
+  }
+  if (requested === 'fapshi') {
+    const c = fapshiConfigFrom(await loadIntegration('fapshi'));
+    if (fapshiConfigured(c)) return new FapshiCollections(c);
   }
   return new MockProvider(requested);
 }
