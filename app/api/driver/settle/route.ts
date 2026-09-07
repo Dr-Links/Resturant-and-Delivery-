@@ -1,10 +1,28 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
+import { createClient } from '@supabase/supabase-js';
 import { getServerSupabase } from '@/lib/supabase/server';
 import { resolveCollectionsProvider } from '@/lib/payments/resolve';
 
 export const runtime = 'nodejs';
+
+const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'https://ylgvwzwmgeiuyhomxvuh.supabase.co';
+const SUPA_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? 'sb_publishable_6Jzncu3t9rb2bwi5hHWRYg_VTKFXyLE';
+
+// Native clients (the Expo driver app) authenticate with a Bearer token instead
+// of cookies. A token client runs RPCs as that user, so settle_driver_balance's
+// auth.uid() checks work the same as the cookie-based web flow.
+function clientFor(req: Request) {
+  const authz = req.headers.get('authorization');
+  if (authz && authz.toLowerCase().startsWith('bearer ')) {
+    return createClient(SUPA_URL, SUPA_ANON, {
+      global: { headers: { Authorization: authz } },
+      auth: { persistSession: false },
+    });
+  }
+  return getServerSupabase();
+}
 
 const Body = z.object({
   amount: z.number().positive(),
@@ -23,7 +41,7 @@ export async function POST(req: Request) {
   if (!parsed.success) return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   const { amount, phone, provider } = parsed.data;
 
-  const supabase = getServerSupabase();
+  const supabase = clientFor(req);
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
 

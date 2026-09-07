@@ -10,6 +10,10 @@ const CARD = '#151517';
 const LINE = '#232327';
 const MUTED = '#a1a1aa';
 
+// Web API base for gateway-backed endpoints (settlement). Override per build via
+// EXPO_PUBLIC_API_BASE; defaults to production.
+const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? 'https://resturant-and-delivery.vercel.app';
+
 type Driver = { id: string; status: string; is_online: boolean; rating_avg: number; rating_count: number };
 type Offer = { id: string; request_id: string; pickup: string | null; dest: string | null; fee: number; earnings: number; item: string };
 type Active = { id: string; status: string; dest_address: string | null; driver_earnings: number };
@@ -56,6 +60,9 @@ function Home() {
   const [active, setActive] = useState<Active | null>(null);
   const [balance, setBalance] = useState(0);
   const [code, setCode] = useState('');
+  const [phone, setPhone] = useState('');
+  const [provider, setProvider] = useState<'mtn' | 'orange'>('mtn');
+  const [settling, setSettling] = useState(false);
   const watch = useRef<Location.LocationSubscription | null>(null);
 
   const loadDriver = useCallback(async () => {
@@ -112,9 +119,33 @@ function Home() {
     else Alert.alert('Wrong code', 'The code does not match. Ask the customer again.');
   }
   async function settle() {
-    if (balance <= 0) return;
-    const { data } = await supabase.rpc('settle_driver_balance', { p_amount: balance, p_method: 'momo', p_reference: 'app' });
-    if ((data as any)?.ok) { Alert.alert('Settled', 'Balance cleared.'); loadDriver(); }
+    if (balance <= 0 || settling) return;
+    if (phone.trim().length < 6) { Alert.alert('Phone required', 'Enter your mobile money number.'); return; }
+    setSettling(true);
+    try {
+      // Route through the gateway endpoint (real MoMo collect) like the web app,
+      // authenticating with the driver's bearer token instead of cookies.
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) { Alert.alert('Session expired', 'Please sign in again.'); return; }
+      const res = await fetch(`${API_BASE}/api/driver/settle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ amount: balance, phone: phone.trim(), provider }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string; live?: boolean };
+      if (res.ok && data.ok) {
+        Alert.alert('Settlement', data.live ? 'Submitted — approve the prompt on your phone.' : 'Recorded (test mode).');
+        setPhone('');
+        loadDriver();
+      } else {
+        Alert.alert('Could not settle', data.error === 'gateway_declined' ? 'Payment was declined.' : 'Please try again.');
+      }
+    } catch {
+      Alert.alert('Network error', 'Please try again.');
+    } finally {
+      setSettling(false);
+    }
   }
 
   const nextStatus: Record<string, { s: string; label: string }> = {
@@ -143,7 +174,34 @@ function Home() {
       <View style={styles.card}>
         <Text style={styles.muted}>Owed to platform</Text>
         <Text style={styles.balance}>{balance} XAF</Text>
-        {balance > 0 && <TouchableOpacity style={styles.outline} onPress={settle}><Text style={styles.outlineText}>Settle via mobile money</Text></TouchableOpacity>}
+        {balance > 0 && (
+          <View style={{ gap: 10, marginTop: 12 }}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {(['mtn', 'orange'] as const).map((p) => (
+                <TouchableOpacity
+                  key={p}
+                  onPress={() => setProvider(p)}
+                  style={[styles.provider, provider === p && styles.providerActive]}
+                >
+                  <Text style={{ color: provider === p ? BRAND : MUTED, fontWeight: '600' }}>
+                    {p === 'mtn' ? 'MTN MoMo' : 'Orange Money'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TextInput
+              value={phone}
+              onChangeText={setPhone}
+              placeholder="Mobile money number"
+              placeholderTextColor={MUTED}
+              keyboardType="phone-pad"
+              style={styles.input}
+            />
+            <TouchableOpacity style={styles.outline} onPress={settle} disabled={settling}>
+              <Text style={styles.outlineText}>{settling ? 'Processing…' : `Settle ${balance} XAF`}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {offer && !active && (
@@ -192,6 +250,8 @@ const styles = StyleSheet.create({
   primaryText: { color: '#000', fontWeight: '700' },
   outline: { borderColor: LINE, borderWidth: 1, borderRadius: 999, padding: 14, alignItems: 'center', marginTop: 12 },
   outlineText: { color: '#f4f4f5', fontWeight: '600' },
+  provider: { flex: 1, borderColor: LINE, borderWidth: 1, borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  providerActive: { borderColor: BRAND, backgroundColor: 'rgba(255,106,43,0.1)' },
   card: { backgroundColor: CARD, borderColor: LINE, borderWidth: 1, borderRadius: 18, padding: 16 },
   row: { flexDirection: 'row', gap: 10 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
