@@ -9,6 +9,7 @@ type Restaurant = {
   currency: string; timezone: string; created_at: string;
   settings: Record<string, unknown>; owner: ProfileRef;
 };
+type StatRow = { tables_count: number; menu_items_count: number; orders_count: number; active_staff_count: number };
 
 const STATUS_BADGE: Record<string, string> = {
   active: 'bg-brand/20 text-brand border border-brand/50',
@@ -36,17 +37,17 @@ export default async function AdminRestaurantDetail({ params }: { params: { id: 
   if (!restaurant) notFound();
   const r = restaurant as unknown as Restaurant;
 
-  // Admin-readable counts only: tables (public read) + published menu items
-  // (available/sold_out are public-read; orders/staff are staff-only under RLS
-  // and would show misleading zeros, so they are omitted here).
-  const [tables, menuItems] = await Promise.all([
-    supabase.from('tables').select('id', { count: 'exact', head: true }).eq('restaurant_id', r.id),
-    supabase.from('menu_items').select('id', { count: 'exact', head: true }).eq('restaurant_id', r.id),
-  ]);
+  // Real counts via the admin RPC (SECURITY DEFINER, gated on is_saas_admin):
+  // orders and staff are staff-only under RLS, so a direct query would show
+  // misleading zeros — the RPC returns true counts to platform admins.
+  const { data: statRows } = await supabase.rpc('admin_restaurant_stats', { p_restaurant_id: r.id });
+  const s = (statRows as StatRow[] | null)?.[0] ?? { tables_count: 0, menu_items_count: 0, orders_count: 0, active_staff_count: 0 };
 
   const stats = [
-    { label: 'Tables', value: tables.count ?? 0 },
-    { label: 'Menu items (published)', value: menuItems.count ?? 0 },
+    { label: 'Tables', value: s.tables_count },
+    { label: 'Menu items', value: s.menu_items_count },
+    { label: 'Orders', value: s.orders_count },
+    { label: 'Active staff', value: s.active_staff_count },
   ];
 
   const settings = r.settings ?? {};
