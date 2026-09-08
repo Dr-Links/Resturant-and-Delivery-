@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 type Config = {
   base_fee: number; per_km: number; commission_rate: number;
   cash_owed_limit: number; warn_threshold: number; offer_timeout_seconds: number;
+  three_d_enabled: boolean;
 };
 
 export function SettingsForm({ initial }: { initial: Config }) {
@@ -17,6 +18,7 @@ export function SettingsForm({ initial }: { initial: Config }) {
     cash_owed_limit: Number(initial.cash_owed_limit ?? 5000),
     warn_threshold: Number(initial.warn_threshold ?? 3000),
     offer_timeout_seconds: Number(initial.offer_timeout_seconds ?? 45),
+    three_d_enabled: initial.three_d_enabled !== false,
   });
   const [saved, setSaved] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -29,7 +31,8 @@ export function SettingsForm({ initial }: { initial: Config }) {
     const { error } = await supabase.from('platform_config').update({
       base_fee: c.base_fee, per_km: c.per_km, commission_rate: c.commission_rate,
       cash_owed_limit: c.cash_owed_limit, warn_threshold: c.warn_threshold,
-      offer_timeout_seconds: c.offer_timeout_seconds, updated_at: new Date().toISOString(),
+      offer_timeout_seconds: c.offer_timeout_seconds, three_d_enabled: c.three_d_enabled,
+      updated_at: new Date().toISOString(),
     }).eq('id', 1);
     setBusy(false);
     if (error) { setErr(error.message); return; }
@@ -49,7 +52,24 @@ export function SettingsForm({ initial }: { initial: Config }) {
   return (
     <div className="max-w-xl">
       <h1 className="text-2xl font-bold mb-1">Platform settings</h1>
-      <p className="text-sm text-muted mb-4">Delivery pricing and settlement rules for the marketplace. (Secret API keys live in Vercel env vars, not here.)</p>
+      <p className="text-sm text-muted mb-4">Delivery pricing and settlement rules for the marketplace. (Secret API keys live under Integrations.)</p>
+
+      {/* Global 3D/AR feature switch */}
+      <div className="rounded-2xl border border-line bg-card p-4 mb-4 flex items-start justify-between gap-4">
+        <div>
+          <p className="font-medium">3D / AR dish view</p>
+          <p className="text-xs text-muted mt-0.5">Platform-wide. When off, customers see dish photos only (no 3D viewer) across every restaurant. Turn on to show 3D/AR where models exist.</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={c.three_d_enabled}
+          onClick={() => setC((p) => ({ ...p, three_d_enabled: !p.three_d_enabled }))}
+          className={'relative h-7 w-12 shrink-0 rounded-full transition-colors ' + (c.three_d_enabled ? 'bg-brand' : 'bg-line')}
+        >
+          <span className={'absolute top-1 h-5 w-5 rounded-full bg-white transition-all ' + (c.three_d_enabled ? 'left-6' : 'left-1')} />
+        </button>
+      </div>
 
       <div className="rounded-2xl border border-line bg-card p-4">
         <Row label="Base delivery fee" hint="Charged on every delivery" value={c.base_fee} onChange={(v) => set('base_fee', v)} suffix="XAF" />

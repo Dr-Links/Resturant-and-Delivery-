@@ -50,7 +50,7 @@ function Stars({ value, onChange }: { value: number; onChange: (n: number) => vo
 }
 
 export function MenuClient({
-  restaurant, table, session, categories, items, activity, videos, socialVideoUrl, orderingEnabled = true,
+  restaurant, table, session, categories, items, activity, videos, socialVideoUrl, orderingEnabled = true, threeDEnabled = true,
 }: {
   restaurant: Restaurant;
   table: { id: string; label: string };
@@ -61,6 +61,7 @@ export function MenuClient({
   videos: Video[];
   socialVideoUrl?: string | null;
   orderingEnabled?: boolean;
+  threeDEnabled?: boolean;
 }) {
   const [cart, setCart] = useState<Record<string, number>>({});
   const [openItem, setOpenItem] = useState<MenuItem | null>(null);
@@ -99,7 +100,7 @@ export function MenuClient({
   const renderCard = (i: MenuItem) => (
     <button key={i.id} onClick={() => openAndLog(i)} className="text-left rounded-2xl border border-line bg-card overflow-hidden flex">
       <div className="flex-1 p-4">
-        <div className="flex items-center gap-2"><h3 className="font-semibold">{i.name}</h3>{model(i) && <span className="rounded-full bg-brand/15 text-brand text-[10px] px-2 py-0.5 border border-brand/40">AR</span>}</div>
+        <div className="flex items-center gap-2"><h3 className="font-semibold">{i.name}</h3>{threeDEnabled && model(i) && <span className="rounded-full bg-brand/15 text-brand text-[10px] px-2 py-0.5 border border-brand/40">AR</span>}</div>
         {i.description && <p className="mt-1 text-sm text-muted line-clamp-2">{i.description}</p>}
         <p className="mt-2 font-semibold text-brand">{money(i.price, cur)}</p>
       </div>
@@ -315,7 +316,11 @@ export function MenuClient({
         <div className="fixed inset-0 z-20 bg-black/70 flex items-end sm:items-center sm:justify-center" onClick={() => setOpenItem(null)}>
           <div className="w-full sm:max-w-md bg-ink border-t sm:border border-line rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="p-5">
-              <ARViewer glb={model(openItem)?.glb_url ?? null} usdz={model(openItem)?.usdz_url ?? null} poster={img(openItem)} alt={openItem.name} />
+              {threeDEnabled ? (
+                <ARViewer glb={model(openItem)?.glb_url ?? null} usdz={model(openItem)?.usdz_url ?? null} poster={img(openItem)} alt={openItem.name} />
+              ) : (
+                img(openItem) ? <img src={img(openItem)!} alt={openItem.name} className="w-full h-56 object-cover rounded-2xl" /> : null
+              )}
               <div className="mt-4">
                 <h2 className="text-2xl font-bold">{openItem.name}</h2>
                 <p className="mt-1 text-brand font-semibold text-lg">{money(openItem.price, cur)}</p>

@@ -45,6 +45,9 @@ export default async function TablePage({ params }: { params: { token: string } 
     supabase.from('menu_item_videos').select('id,url,title').eq('restaurant_id', info.restaurant_id).limit(10),
   ]);
 
+  // Platform-wide 3D/AR switch (anon-readable). Defaults on.
+  const { data: pconfig } = await supabase.from('platform_config').select('three_d_enabled').eq('id', 1).maybeSingle();
+
   return (
     <MenuClient
       restaurant={restaurant ?? { id: info.restaurant_id, name: 'Menu', currency: 'XAF' }}
@@ -56,6 +59,7 @@ export default async function TablePage({ params }: { params: { token: string } 
       videos={(videos as { id: string; url: string; title: string | null }[]) ?? []}
       socialVideoUrl={((restaurant as any)?.settings?.social_video_url as string | undefined) ?? null}
       orderingEnabled={(restaurant as any)?.settings?.digital_ordering_enabled !== false}
+      threeDEnabled={(pconfig as any)?.three_d_enabled !== false}
     />
   );
 }
