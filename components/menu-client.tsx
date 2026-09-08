@@ -24,6 +24,18 @@ function platformOf(url: string): string {
   if (/(youtube\.com|youtu\.be)/i.test(url)) return 'YouTube';
   return 'social';
 }
+// Inline-playable embed URL for the restaurant's preferred platform. YouTube,
+// TikTok and Facebook play inline; Instagram (needs its own script) -> null (button).
+function socialEmbed(url: string): { src: string; vertical: boolean } | null {
+  const yt = ytId(url);
+  if (yt) return { src: `https://www.youtube.com/embed/${yt}`, vertical: false };
+  const tk = url.match(/tiktok\.com\/(?:.*\/video\/|v\/)(\d+)/);
+  if (tk) return { src: `https://www.tiktok.com/embed/v2/${tk[1]}`, vertical: true };
+  if (/(facebook\.com|fb\.watch)/i.test(url)) {
+    return { src: `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=false`, vertical: false };
+  }
+  return null;
+}
 
 function Stars({ value, onChange }: { value: number; onChange: (n: number) => void }) {
   return (
@@ -190,9 +202,23 @@ export function MenuClient({
 
       {activity.length > 0 && (
         <section className="px-5 pt-4">
-          <p className="text-xs uppercase tracking-wide text-muted mb-2">Popular right now at other tables</p>
+          <p className="text-xs uppercase tracking-wide text-muted mb-2">Popular right now · tap to view</p>
           <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-            {activity.map((a, idx) => (<div key={idx} className="shrink-0 rounded-full border border-line bg-card px-3 py-1.5 text-sm"><span className="text-brand font-semibold">{a.item_name}</span><span className="text-muted"> · Table {a.table_label}</span></div>))}
+            {activity.map((a, idx) => {
+              const match = items.find((i) => i.name.toLowerCase() === a.item_name.toLowerCase());
+              return (
+                <button
+                  key={idx}
+                  onClick={() => match && openAndLog(match)}
+                  disabled={!match}
+                  className="shrink-0 rounded-full border border-line bg-card px-3 py-1.5 text-sm flex items-center gap-1.5 disabled:opacity-70 enabled:hover:border-brand transition-colors"
+                >
+                  <span>🔥</span>
+                  <span className="text-brand font-semibold">{a.item_name}</span>
+                  {a.qty > 1 && <span className="text-muted">×{a.qty}</span>}
+                </button>
+              );
+            })}
           </div>
         </section>
       )}
@@ -200,18 +226,25 @@ export function MenuClient({
       {(socialVideoUrl || videos.length > 0) && (
         <section className="px-5 pt-4">
           <p className="text-xs uppercase tracking-wide text-muted mb-2">Watch 🎬</p>
-          {socialVideoUrl && (
-            ytId(socialVideoUrl) ? (
-              <div className="mb-3 aspect-video overflow-hidden rounded-2xl border border-line">
-                <iframe
-                  src={`https://www.youtube.com/embed/${ytId(socialVideoUrl)}`}
-                  title="Featured video"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  className="w-full h-full"
-                />
-              </div>
-            ) : (
+          {socialVideoUrl && (() => {
+            const embed = socialEmbed(socialVideoUrl);
+            if (embed) {
+              return (
+                <div
+                  className={'mb-3 overflow-hidden rounded-2xl border border-line bg-black ' + (embed.vertical ? '' : 'aspect-video')}
+                  style={embed.vertical ? { height: 560 } : undefined}
+                >
+                  <iframe
+                    src={embed.src}
+                    title="Featured video"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="w-full h-full"
+                  />
+                </div>
+              );
+            }
+            return (
               <a
                 href={socialVideoUrl}
                 target="_blank"
@@ -221,8 +254,8 @@ export function MenuClient({
                 <span>Watch our {platformOf(socialVideoUrl)} video</span>
                 <span>↗</span>
               </a>
-            )
-          )}
+            );
+          })()}
           {videos.length > 0 && (
             <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
               {videos.map((v) => (
