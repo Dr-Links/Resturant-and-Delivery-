@@ -69,8 +69,10 @@ Plus an **Expo/React Native driver app** (`apps/driver/`) for independent driver
 
 ## Customer experience & owner content (✅ live)
 
-**The smart menu** — one screen after a QR scan (`/t/[token]`, `force-dynamic`).
-Everything below happens in that single general-menu view, no leaving the page:
+**The smart menu** — one screen after a QR scan (`/t/[token]`, `force-dynamic` +
+`fetchCache = 'force-no-store'` so owner edits always reach customers — see
+Operational notes). Everything below happens in that single general-menu view,
+no leaving the page:
 
 - **Scan → browse → tap any dish → 3D.** Tapping a dish opens a 3D view: the uploaded
   model when present, otherwise a friendly floating placeholder — both with an
@@ -218,3 +220,9 @@ and takes effect immediately — no redeploy, no code.**
 - Demo users must be seeded via `supabase/seed.sql` (or the Admin API) — never raw
   `INSERT` into `auth.users` without setting token columns to `''`, or GoTrue login
   breaks with "Database error querying schema".
+- **Customer-facing pages must set `fetchCache = 'force-no-store'`, not just
+  `dynamic = 'force-dynamic'`.** Supabase `.select()` calls are GET requests that
+  Next's Data Cache still cached across requests, so owner menu/settings/social-video
+  edits didn't reach customers (while RPC-based table activity, a POST, stayed fresh).
+  `force-no-store` on `/t/[token]` fixed it (commit `6a5e738`). Apply the same to any
+  new page where one user must see another user's writes.
