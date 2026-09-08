@@ -56,7 +56,7 @@ function Stars({ value, onChange }: { value: number; onChange: (n: number) => vo
 }
 
 export function MenuClient({
-  restaurant, table, session, categories, items, activity, videos, socialVideoUrl, orderingEnabled = true, threeDEnabled = true, paymentQrUrl,
+  restaurant, table, session, categories, items, activity, videos, socialVideoUrl, orderingEnabled = true, threeDEnabled = true, paymentQrUrl, logoUrl,
 }: {
   restaurant: Restaurant;
   table: { id: string; label: string };
@@ -69,9 +69,11 @@ export function MenuClient({
   orderingEnabled?: boolean;
   threeDEnabled?: boolean;
   paymentQrUrl?: string | null;
+  logoUrl?: string | null;
 }) {
   const [cart, setCart] = useState<Record<string, number>>({});
   const [openItem, setOpenItem] = useState<MenuItem | null>(null);
+  const [showPopular, setShowPopular] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [placed, setPlaced] = useState<{ number: number; total: number } | null>(null);
   const [payment, setPayment] = useState<{ orderId: string; number: number; total: number } | null>(null);
@@ -119,6 +121,11 @@ export function MenuClient({
   // group them under "More" so every available dish shows to customers.
   const catIds = new Set(categories.map((c) => c.id));
   const otherItems = items.filter((i) => !i.category_id || !catIds.has(i.category_id));
+  const shownCategories = categories.filter((cat) => items.some((i) => i.category_id === cat.id));
+
+  const scrollToCat = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   async function placeOrder() {
     if (count === 0 || placing) return;
@@ -219,32 +226,63 @@ export function MenuClient({
 
   return (
     <main className="min-h-screen pb-28">
-      <header className="sticky top-0 z-10 bg-ink/90 backdrop-blur border-b border-line px-5 py-4">
-        <div className="flex items-center justify-between">
-          <div><h1 className="text-xl font-bold leading-tight">{restaurant.name}</h1><p className="text-xs text-muted">Table {table.label} · Session #{session.code}</p></div>
-          <div className="text-right text-xs text-muted"><span className="inline-flex items-center gap-1 rounded-full border border-line px-2 py-1"><span className="h-2 w-2 rounded-full bg-green-500" /> Dining in</span></div>
+      <header className="sticky top-0 z-10 bg-ink/90 backdrop-blur border-b border-line px-5 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            {logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt="" className="h-9 w-9 rounded-lg object-cover border border-line shrink-0" />
+            )}
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold leading-tight truncate">{restaurant.name}</h1>
+              <p className="text-xs text-muted">Table {table.label} · Session #{session.code}</p>
+            </div>
+          </div>
+          <span className="shrink-0 inline-flex items-center gap-1 rounded-full border border-line px-2 py-1 text-xs text-muted"><span className="h-2 w-2 rounded-full bg-green-500" /> Dining in</span>
         </div>
+
+        {/* Category nav bar (jump to a section) + "what others ordered" toggle */}
+        {(shownCategories.length > 0 || otherItems.length > 0 || activity.length > 0) && (
+          <div className="mt-3 flex gap-2 overflow-x-auto no-scrollbar">
+            {activity.length > 0 && (
+              <button
+                onClick={() => setShowPopular((s) => !s)}
+                className={'shrink-0 rounded-full border px-3 py-1.5 text-sm whitespace-nowrap ' + (showPopular ? 'border-brand bg-brand/10 text-brand' : 'border-line bg-card hover:border-brand')}
+              >
+                🔥 Others ordered
+              </button>
+            )}
+            {shownCategories.map((cat) => (
+              <button key={cat.id} onClick={() => scrollToCat(`cat-${cat.id}`)} className="shrink-0 rounded-full border border-line bg-card px-3 py-1.5 text-sm hover:border-brand">{cat.name}</button>
+            ))}
+            {otherItems.length > 0 && (
+              <button onClick={() => scrollToCat('cat-more')} className="shrink-0 rounded-full border border-line bg-card px-3 py-1.5 text-sm hover:border-brand">{categories.length > 0 ? 'More' : 'Menu'}</button>
+            )}
+          </div>
+        )}
       </header>
 
-      {activity.length > 0 && (
+      {showPopular && activity.length > 0 && (
         <section className="px-5 pt-4">
-          <p className="text-xs uppercase tracking-wide text-muted mb-2">Popular right now · tap to view</p>
-          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-            {activity.map((a, idx) => {
-              const match = items.find((i) => i.name.toLowerCase() === a.item_name.toLowerCase());
-              return (
-                <button
-                  key={idx}
-                  onClick={() => match && openAndLog(match)}
-                  disabled={!match}
-                  className="shrink-0 rounded-full border border-line bg-card px-3 py-1.5 text-sm flex items-center gap-1.5 disabled:opacity-70 enabled:hover:border-brand transition-colors"
-                >
-                  <span>🔥</span>
-                  <span className="text-brand font-semibold">{a.item_name}</span>
-                  {a.qty > 1 && <span className="text-muted">×{a.qty}</span>}
-                </button>
-              );
-            })}
+          <div className="rounded-2xl border border-line bg-card p-3">
+            <p className="text-xs uppercase tracking-wide text-muted mb-2">What other tables ordered · tap to view</p>
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+              {activity.map((a, idx) => {
+                const match = items.find((i) => i.name.toLowerCase() === a.item_name.toLowerCase());
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => match && openAndLog(match)}
+                    disabled={!match}
+                    className="shrink-0 rounded-full border border-line bg-ink px-3 py-1.5 text-sm flex items-center gap-1.5 disabled:opacity-70 enabled:hover:border-brand transition-colors"
+                  >
+                    <span>🔥</span>
+                    <span className="text-brand font-semibold">{a.item_name}</span>
+                    {a.qty > 1 && <span className="text-muted">×{a.qty}</span>}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </section>
       )}
@@ -305,7 +343,7 @@ export function MenuClient({
           const catItems = items.filter((i) => i.category_id === cat.id);
           if (catItems.length === 0) return null;
           return (
-            <section key={cat.id}>
+            <section key={cat.id} id={`cat-${cat.id}`} className="scroll-mt-32">
               <h2 className="text-lg font-bold mb-3">{cat.name}</h2>
               <div className="grid grid-cols-1 gap-3">{catItems.map(renderCard)}</div>
             </section>
@@ -313,7 +351,7 @@ export function MenuClient({
         })}
 
         {otherItems.length > 0 && (
-          <section>
+          <section id="cat-more" className="scroll-mt-32">
             <h2 className="text-lg font-bold mb-3">{categories.length > 0 ? 'More' : 'Menu'}</h2>
             <div className="grid grid-cols-1 gap-3">{otherItems.map(renderCard)}</div>
           </section>

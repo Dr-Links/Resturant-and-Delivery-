@@ -32,6 +32,35 @@ export function SettingsToggles({ restaurantId, initial }: { restaurantId: strin
   const [savingSocial, setSavingSocial] = useState(false);
   const [qrUrl, setQrUrl] = useState<string>((initial.payment_qr_url as string) ?? '');
   const [qrBusy, setQrBusy] = useState(false);
+  const [logoUrl, setLogoUrl] = useState<string>((initial.logo_url as string) ?? '');
+  const [logoBusy, setLogoBusy] = useState(false);
+
+  async function saveKey(key: string, value: string | null) {
+    const next = { ...settings, [key]: value };
+    const { error } = await supabase.from('restaurants').update({ settings: next, updated_at: new Date().toISOString() }).eq('id', restaurantId);
+    if (error) throw error;
+    setSettings(next);
+  }
+
+  async function uploadImage(kind: 'logo' | 'payment-qr', file: File, onUrl: (u: string) => void, settingKey: string, setBusyFn: (b: boolean) => void, okMsg: string) {
+    setBusyFn(true); setMsg(null);
+    try {
+      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${restaurantId}/${kind}/${Date.now()}-${safe}`;
+      const { error: upErr } = await supabase.storage.from('item-images').upload(path, file, { contentType: file.type || 'image/png' });
+      if (upErr) throw upErr;
+      const url = supabase.storage.from('item-images').getPublicUrl(path).data.publicUrl;
+      await saveKey(settingKey, url);
+      onUrl(url); setMsg(okMsg); router.refresh();
+    } catch { setMsg('Could not upload the image.'); } finally { setBusyFn(false); }
+  }
+
+  async function clearLogo() {
+    setLogoBusy(true); setMsg(null);
+    try { await saveKey('logo_url', null); setLogoUrl(''); router.refresh(); }
+    catch { setMsg('Could not remove the logo.'); }
+    finally { setLogoBusy(false); }
+  }
 
   async function saveSocial() {
     setSavingSocial(true); setMsg(null);
@@ -98,6 +127,23 @@ export function SettingsToggles({ restaurantId, initial }: { restaurantId: strin
       <p className="text-sm text-muted mb-3">Turn restaurant features on or off. Changes are saved instantly.</p>
 
       {msg && <p className="mb-3 text-sm text-brand">{msg}</p>}
+
+      <div className="rounded-2xl border border-line bg-card p-4 mb-4">
+        <p className="font-medium">Restaurant logo</p>
+        <p className="text-xs text-muted mt-0.5 mb-3">Shown in the top bar of the customer menu.</p>
+        <div className="flex items-center gap-3">
+          {logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt="Logo" className="h-14 w-14 rounded-lg object-cover border border-line" />
+          )}
+          <label className="rounded-full bg-brand text-black px-4 py-1.5 text-sm font-semibold cursor-pointer">
+            {logoBusy ? 'Uploading…' : logoUrl ? 'Replace logo' : '+ Upload logo'}
+            <input type="file" accept="image/*" className="hidden" disabled={logoBusy}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadImage('logo', f, setLogoUrl, 'logo_url', setLogoBusy, 'Logo saved.'); e.currentTarget.value = ''; }} />
+          </label>
+          {logoUrl && <button onClick={clearLogo} disabled={logoBusy} className="rounded-full border border-line px-4 py-1.5 text-sm text-muted">Remove</button>}
+        </div>
+      </div>
 
       <div className="rounded-2xl border border-line bg-card divide-y divide-line">
         {FEATURES.map((f) => {
