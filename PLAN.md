@@ -74,6 +74,12 @@ Plus an **Expo/React Native driver app** (`apps/driver/`) for independent driver
 Operational notes). Everything below happens in that single general-menu view,
 no leaving the page:
 
+- **Top bar + category filter nav.** The header shows the **restaurant logo**
+  (`restaurants.settings.logo_url`, uploaded in Settings) beside the name, table, and a
+  "Dining in" badge. Below it a **category chip bar filters the menu**: tapping a
+  category (Mains, Drinks, Dessert…) shows **only that category's dishes**; an **"All"**
+  chip resets to the full menu. A **"🔥 Others ordered"** toggle chip sits in the same
+  bar and reveals the cross-table panel on demand (see below).
 - **Scan → browse → tap any dish → 3D.** Tapping a dish opens a 3D view: the uploaded
   model when present, otherwise a friendly floating placeholder — both with an
   **animated cartoon chef 👨‍🍳**. New dishes are included automatically. (Real per-dish
@@ -83,11 +89,13 @@ no leaving the page:
   guidance + a loading state. A **platform-wide 3D switch** (SaaS admin → Settings,
   `platform_config.three_d_enabled`, migration `0028`) can disable 3D everywhere
   (photos only); default on, so working models like the Avocado Bowl keep showing.
-- **See what other tables ordered — and view those dishes in 3D.** The "Popular right
-  now" strip shows dish + table label only (no names/prices/personal info), gated by
-  `show_table_activity`, 24h window (migration `0025`). Each chip is **tap-to-view**:
-  it opens the matching dish in the same 3D view. `get_table_activity` is the only
-  public path to cross-table data.
+- **See what other tables ordered — and view those dishes in 3D.** Hidden behind the
+  **"🔥 Others ordered"** toggle in the nav bar; when opened it shows a panel **grouped
+  and labelled per table** ("Table 8", "Table 12"…) with each ordered dish as a chip —
+  dish + table label only, no names/prices/personal info. Gated by `show_table_activity`,
+  24h window (migration `0025`). Each dish chip is **tap-to-view**: it opens the matching
+  dish in the same 3D view. `get_table_activity` is the only public path to cross-table
+  data.
 - **Watch section — social + uploaded videos, all inline.** The restaurant's uploaded
   ("normal") videos are swipeable in the menu (not only post-order), plus one **featured
   social video** (`restaurants.settings.social_video_url`) that **plays inline without
@@ -101,10 +109,11 @@ no leaving the page:
   owner Orders tab**.
 - **Owner content management** (restaurant dashboard), all reflected in the customer
   `/t` view on next load (it is `force-dynamic`):
-  - **Settings** (`/dashboard/settings`) — edit the **restaurant name**, **add/delete
+  - **Settings** (`/dashboard/settings`) — upload/replace/remove the **restaurant logo**
+    (`logo_url`, shown in the customer top bar), edit the **restaurant name**, **add/delete
     menu categories** (delete keeps dishes, un-categorised), instant feature toggles
-    (`show_table_activity`, `digital_ordering_enabled`, `kitchen_screen_enabled`), and
-    the featured social video link.
+    (`show_table_activity`, `digital_ordering_enabled`, `kitchen_screen_enabled`), the
+    featured social video link, and the **payment QR** (scan-to-pay).
   - **Menu** — add a dish (name/price/category **+ optional photo**) and delete
     (cascades photos/models), plus inline price + available/sold-out/hidden.
   - **Photos** — per-dish add/remove (public `item-images` bucket; first photo = poster).
