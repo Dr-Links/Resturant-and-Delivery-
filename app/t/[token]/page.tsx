@@ -3,6 +3,11 @@ import { supabase } from '@/lib/supabase';
 import { MenuClient } from '@/components/menu-client';
 
 export const dynamic = 'force-dynamic';
+// Supabase selects are GET requests that Next's Data Cache would otherwise cache
+// (that's why menu/settings edits didn't reach customers while RPC-based activity
+// did). Force every fetch on this route to bypass the cache so the customer menu
+// always reflects the latest owner changes.
+export const fetchCache = 'force-no-store';
 
 type ItemModel = { glb_url: string | null; usdz_url: string | null; status: string };
 type ItemImage = { url: string; sort_order: number };
