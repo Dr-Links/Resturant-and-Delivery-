@@ -24,13 +24,19 @@ function platformOf(url: string): string {
   if (/(youtube\.com|youtu\.be)/i.test(url)) return 'YouTube';
   return 'social';
 }
-// Inline-playable embed URL for the restaurant's preferred platform. YouTube,
-// TikTok and Facebook play inline; Instagram (needs its own script) -> null (button).
+// Inline-playable embed URL for the restaurant's preferred platform — the video
+// plays inside the smart menu, no leaving the app. Covers YouTube, TikTok,
+// Instagram (reel/post/tv) and Facebook; unknown URLs -> null (button fallback).
 function socialEmbed(url: string): { src: string; vertical: boolean } | null {
   const yt = ytId(url);
   if (yt) return { src: `https://www.youtube.com/embed/${yt}`, vertical: false };
   const tk = url.match(/tiktok\.com\/(?:.*\/video\/|v\/)(\d+)/);
   if (tk) return { src: `https://www.tiktok.com/embed/v2/${tk[1]}`, vertical: true };
+  const ig = url.match(/instagram\.com\/(p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i);
+  if (ig) {
+    const kind = ig[1].toLowerCase() === 'reels' ? 'reel' : ig[1].toLowerCase();
+    return { src: `https://www.instagram.com/${kind}/${ig[2]}/embed`, vertical: true };
+  }
   if (/(facebook\.com|fb\.watch)/i.test(url)) {
     return { src: `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=false`, vertical: false };
   }
