@@ -172,14 +172,23 @@ and takes effect immediately — no redeploy, no code.**
    `notify-fanout` edge function now reads them from the store; `supabase secrets set …`
    still works as a fallback).
 
+## AI photo→3D generation (✅ built; awaits a provider key) — migration `0027`
+
+- **Fully wired end-to-end.** On a dish's page, **✨ Generate 3D from the dish photo**
+  → `POST /api/threed/generate` starts a job (Meshy image-to-3D shape, base URL
+  configurable) from the dish's first photo; `GET /api/threed/status` polls, and on
+  success downloads the `.glb`, stores it on the `models` bucket, and inserts a
+  **preview** `menu_item_3d_models` row (AI models never auto-publish — approve→publish
+  applies, spec §9). `model_gen_jobs` tracks progress (owner-read RLS).
+- Credentials come from the **3D model generation** provider in the integration store
+  (`THREEDGEN_PROVIDER` / `THREEDGEN_BASE_URL` / `THREEDGEN_API_KEY`). Until a key is
+  entered, the button returns a friendly "add a 3D-gen key" message — no errors.
+- **To activate:** enter a Meshy (or compatible) API key under
+  `/admin/integrations → 3D model generation`. Provider abstraction lives in
+  `lib/threedgen` (12 unit tests).
+
 ## Known gaps / future ideas (optional — only remaining *code* work)
 
-- **AI photo→3D generation** — the biggest one. Dishes without an uploaded model show
-  the chef placeholder; real per-dish 3D needs a 3D-gen service (Meshy/Luma/etc.). The
-  dashboard slot is ready (**3D model generation** provider, migration `0026`, keys
-  `THREEDGEN_*`); the generation wiring (call the API from a dish photo, store the
-  resulting `.glb` on `menu_item_3d_models`) is **not built yet**. Enter the key when
-  you have it, then this gets wired.
 - Orange **disbursement** (driver payout) is not wired — falls back to mock; only MTN
   disbursement is implemented.
 - The Expo driver app is unverified in CI (excluded from the Next build); its
