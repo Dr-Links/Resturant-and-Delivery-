@@ -26,10 +26,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
     );
   }
 
+  const orderingOn = (restaurant.settings as Record<string, unknown>)?.digital_ordering_enabled !== false;
+
   const nav = [
     { href: '/dashboard', label: 'Overview' },
     { href: '/dashboard/assistant', label: 'Assistant' },
-    { href: '/dashboard/orders', label: 'Orders' },
+    // Orders tab hidden when digital ordering is switched off in Settings.
+    ...(orderingOn ? [{ href: '/dashboard/orders', label: 'Orders' }] : []),
     { href: '/dashboard/menu', label: 'Menu' },
     { href: '/dashboard/analytics', label: 'Analytics' },
     { href: '/dashboard/videos', label: 'Videos' },

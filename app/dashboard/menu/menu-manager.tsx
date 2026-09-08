@@ -26,6 +26,7 @@ export function MenuManager({
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [photo, setPhoto] = useState<File | null>(null);
   const [adding, setAdding] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -38,10 +39,26 @@ export function MenuManager({
       .insert({ restaurant_id: restaurantId, name: name.trim(), price: p, category_id: categoryId || null, status: 'available' })
       .select('id,name,price,status,category_id')
       .single();
+    if (error || !data) { setAdding(false); setErr('Could not add the item.'); return; }
+    const item = data as Item;
+
+    // Optional photo — stored on item-images (used as the dish poster and, later,
+    // as the source for AI photo→3D generation).
+    if (photo) {
+      try {
+        const safe = photo.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = `${restaurantId}/${item.id}/${Date.now()}-${safe}`;
+        const { error: upErr } = await supabase.storage.from('item-images').upload(path, photo, { contentType: photo.type || 'image/jpeg' });
+        if (!upErr) {
+          const url = supabase.storage.from('item-images').getPublicUrl(path).data.publicUrl;
+          await supabase.from('menu_item_images').insert({ item_id: item.id, url, sort_order: 0 });
+        }
+      } catch { /* non-fatal: item is created, photo can be added later */ }
+    }
+
     setAdding(false);
-    if (error || !data) { setErr('Could not add the item.'); return; }
-    setItems((prev) => [...prev, data as Item]);
-    setName(''); setPrice(''); setCategoryId('');
+    setItems((prev) => [...prev, item]);
+    setName(''); setPrice(''); setCategoryId(''); setPhoto(null);
   }
 
   async function deleteItem(item: Item) {
@@ -110,6 +127,11 @@ export function MenuManager({
             {adding ? 'Adding…' : 'Add dish'}
           </button>
         </div>
+        <label className="mt-3 flex items-center gap-2 text-xs text-muted">
+          <span className="rounded-full border border-line px-3 py-1.5 cursor-pointer">{photo ? 'Photo ✓' : '+ Add photo'}</span>
+          <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />
+          <span>Optional — used as the dish photo and for AI 3D generation later.</span>
+        </label>
         {err && <p className="mt-2 text-sm text-red-400">{err}</p>}
       </div>
 

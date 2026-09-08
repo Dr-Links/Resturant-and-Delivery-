@@ -86,8 +86,11 @@ export function ARViewer({
           ar-modes="webxr scene-viewer quick-look"
           ar-scale="auto"
           camera-controls
+          disable-pan
+          disable-tap
+          interaction-prompt="none"
           auto-rotate
-          touch-action="pan-y"
+          touch-action="none"
           shadow-intensity="1"
           style={{ width: '100%', height: '340px', backgroundColor: '#0b0b0c', borderRadius: '16px' }}
         />

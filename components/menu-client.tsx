@@ -50,7 +50,7 @@ function Stars({ value, onChange }: { value: number; onChange: (n: number) => vo
 }
 
 export function MenuClient({
-  restaurant, table, session, categories, items, activity, videos, socialVideoUrl,
+  restaurant, table, session, categories, items, activity, videos, socialVideoUrl, orderingEnabled = true,
 }: {
   restaurant: Restaurant;
   table: { id: string; label: string };
@@ -60,6 +60,7 @@ export function MenuClient({
   activity: Activity[];
   videos: Video[];
   socialVideoUrl?: string | null;
+  orderingEnabled?: boolean;
 }) {
   const [cart, setCart] = useState<Record<string, number>>({});
   const [openItem, setOpenItem] = useState<MenuItem | null>(null);
@@ -310,15 +311,21 @@ export function MenuClient({
                 {openItem.ingredients && (<p className="mt-3 text-sm text-muted"><span className="text-zinc-300">Ingredients: </span>{openItem.ingredients}</p>)}
               </div>
               <div className="mt-5 flex items-center gap-3">
-                {cart[openItem.id] ? (<div className="flex items-center gap-4 rounded-full border border-line px-4 py-2"><button onClick={() => remove(openItem.id)} className="text-xl">−</button><span className="min-w-6 text-center font-semibold">{cart[openItem.id]}</span><button onClick={() => add(openItem.id)} className="text-xl">+</button></div>) : (<button onClick={() => add(openItem.id)} className="flex-1 rounded-full bg-brand px-6 py-3 font-semibold text-black">Add to order</button>)}
-                <button onClick={() => setOpenItem(null)} className="rounded-full border border-line px-5 py-3">Close</button>
+                {orderingEnabled ? (
+                  <>
+                    {cart[openItem.id] ? (<div className="flex items-center gap-4 rounded-full border border-line px-4 py-2"><button onClick={() => remove(openItem.id)} className="text-xl">−</button><span className="min-w-6 text-center font-semibold">{cart[openItem.id]}</span><button onClick={() => add(openItem.id)} className="text-xl">+</button></div>) : (<button onClick={() => add(openItem.id)} className="flex-1 rounded-full bg-brand px-6 py-3 font-semibold text-black">Add to order</button>)}
+                    <button onClick={() => setOpenItem(null)} className="rounded-full border border-line px-5 py-3">Close</button>
+                  </>
+                ) : (
+                  <button onClick={() => setOpenItem(null)} className="flex-1 rounded-full border border-line px-5 py-3">Close</button>
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {count > 0 && (
+      {orderingEnabled && count > 0 && (
         <div className="fixed bottom-0 inset-x-0 z-10 p-4">
           <button onClick={placeOrder} disabled={placing} className="w-full rounded-full bg-brand text-black py-4 font-semibold flex items-center justify-between px-6 shadow-lg disabled:opacity-60">
             <span>{placing ? 'Sending…' : `Place order · ${count} item${count > 1 ? 's' : ''}`}</span>

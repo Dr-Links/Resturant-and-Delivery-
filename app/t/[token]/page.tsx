@@ -55,6 +55,7 @@ export default async function TablePage({ params }: { params: { token: string } 
       activity={(activity as { table_label: string; item_name: string; qty: number }[]) ?? []}
       videos={(videos as { id: string; url: string; title: string | null }[]) ?? []}
       socialVideoUrl={((restaurant as any)?.settings?.social_video_url as string | undefined) ?? null}
+      orderingEnabled={(restaurant as any)?.settings?.digital_ordering_enabled !== false}
     />
   );
 }

@@ -61,9 +61,8 @@ export function SettingsToggles({ restaurantId, initial }: { restaurantId: strin
   }
 
   return (
-    <div className="max-w-xl">
-      <h1 className="text-2xl font-bold mb-1">Settings</h1>
-      <p className="text-sm text-muted mb-4">Turn restaurant features on or off. Changes are saved instantly.</p>
+    <div>
+      <p className="text-sm text-muted mb-3">Turn restaurant features on or off. Changes are saved instantly.</p>
 
       {msg && <p className="mb-3 text-sm text-brand">{msg}</p>}
 
