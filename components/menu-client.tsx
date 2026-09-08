@@ -56,7 +56,7 @@ function Stars({ value, onChange }: { value: number; onChange: (n: number) => vo
 }
 
 export function MenuClient({
-  restaurant, table, session, categories, items, activity, videos, socialVideoUrl, orderingEnabled = true, threeDEnabled = true,
+  restaurant, table, session, categories, items, activity, videos, socialVideoUrl, orderingEnabled = true, threeDEnabled = true, paymentQrUrl,
 }: {
   restaurant: Restaurant;
   table: { id: string; label: string };
@@ -68,6 +68,7 @@ export function MenuClient({
   socialVideoUrl?: string | null;
   orderingEnabled?: boolean;
   threeDEnabled?: boolean;
+  paymentQrUrl?: string | null;
 }) {
   const [cart, setCart] = useState<Record<string, number>>({});
   const [openItem, setOpenItem] = useState<MenuItem | null>(null);
@@ -156,6 +157,7 @@ export function MenuClient({
         orderNumber={payment.number}
         amount={payment.total}
         currency={cur}
+        paymentQrUrl={paymentQrUrl}
         onPaid={() => { setPlaced({ number: payment.number, total: payment.total }); setPayment(null); }}
         onPayLater={() => { setPlaced({ number: payment.number, total: payment.total }); setPayment(null); }}
       />

@@ -30,6 +30,8 @@ export function SettingsToggles({ restaurantId, initial }: { restaurantId: strin
   const [msg, setMsg] = useState<string | null>(null);
   const [socialUrl, setSocialUrl] = useState<string>((initial.social_video_url as string) ?? '');
   const [savingSocial, setSavingSocial] = useState(false);
+  const [qrUrl, setQrUrl] = useState<string>((initial.payment_qr_url as string) ?? '');
+  const [qrBusy, setQrBusy] = useState(false);
 
   async function saveSocial() {
     setSavingSocial(true); setMsg(null);
@@ -38,6 +40,37 @@ export function SettingsToggles({ restaurantId, initial }: { restaurantId: strin
     setSavingSocial(false);
     if (error) { setMsg('Could not save the video link.'); return; }
     setSettings(next); setMsg('Saved.'); router.refresh();
+  }
+
+  async function saveQr(value: string | null) {
+    const next = { ...settings, payment_qr_url: value };
+    const { error } = await supabase.from('restaurants').update({ settings: next, updated_at: new Date().toISOString() }).eq('id', restaurantId);
+    if (error) throw error;
+    setSettings(next);
+  }
+
+  async function uploadQr(file: File) {
+    setQrBusy(true); setMsg(null);
+    try {
+      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${restaurantId}/payment-qr/${Date.now()}-${safe}`;
+      const { error: upErr } = await supabase.storage.from('item-images').upload(path, file, { contentType: file.type || 'image/png' });
+      if (upErr) throw upErr;
+      const url = supabase.storage.from('item-images').getPublicUrl(path).data.publicUrl;
+      await saveQr(url);
+      setQrUrl(url); setMsg('Payment QR saved.'); router.refresh();
+    } catch {
+      setMsg('Could not upload the payment QR.');
+    } finally {
+      setQrBusy(false);
+    }
+  }
+
+  async function clearQr() {
+    setQrBusy(true); setMsg(null);
+    try { await saveQr(null); setQrUrl(''); router.refresh(); }
+    catch { setMsg('Could not remove the payment QR.'); }
+    finally { setQrBusy(false); }
   }
 
   async function toggle(key: string) {
@@ -118,6 +151,26 @@ export function SettingsToggles({ restaurantId, initial }: { restaurantId: strin
           >
             {savingSocial ? 'Saving…' : 'Save'}
           </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-line bg-card p-4 mt-4">
+        <p className="font-medium">Payment QR (scan to pay)</p>
+        <p className="text-xs text-muted mt-0.5 mb-3">
+          Upload your mobile money or bank merchant QR. Customers can scan it at checkout to pay — works
+          <span className="text-white"> with or without </span> the online payment gateway.
+        </p>
+        {qrUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={qrUrl} alt="Payment QR" className="w-32 h-32 rounded-lg bg-white p-1 object-contain mb-3" />
+        )}
+        <div className="flex items-center gap-2">
+          <label className="rounded-full bg-brand text-black px-4 py-1.5 text-sm font-semibold cursor-pointer">
+            {qrBusy ? 'Uploading…' : qrUrl ? 'Replace QR' : '+ Upload QR'}
+            <input type="file" accept="image/*" className="hidden" disabled={qrBusy}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadQr(f); e.currentTarget.value = ''; }} />
+          </label>
+          {qrUrl && <button onClick={clearQr} disabled={qrBusy} className="rounded-full border border-line px-4 py-1.5 text-sm text-muted">Remove</button>}
         </div>
       </div>
     </div>

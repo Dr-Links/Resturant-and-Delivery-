@@ -22,12 +22,16 @@ interface PayOrderProps {
   currency: string;
   onPaid: () => void;
   onPayLater: () => void;
+  paymentQrUrl?: string | null;
 }
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 120_000;
 
-export function PayOrder({ orderId, orderNumber, amount, currency, onPaid, onPayLater }: PayOrderProps) {
+export function PayOrder({ orderId, orderNumber, amount, currency, onPaid, onPayLater, paymentQrUrl }: PayOrderProps) {
+  // Scan-to-pay (static QR) works with or without the online gateway, so it's the
+  // default whenever the restaurant has set a payment QR.
+  const [method, setMethod] = useState<'qr' | 'momo'>(paymentQrUrl ? 'qr' : 'momo');
   const [provider, setProvider] = useState<Provider>('fapshi');
   const [phone, setPhone] = useState('');
   const [phase, setPhase] = useState<Phase>('choose');
@@ -122,35 +126,63 @@ export function PayOrder({ orderId, orderNumber, amount, currency, onPaid, onPay
 
       {(phase === 'choose' || phase === 'failed') && (
         <div className="mt-8 space-y-4">
-          <div className="grid grid-cols-3 gap-2">
-            {PROVIDERS.map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                onClick={() => setProvider(p.key)}
-                className={
-                  'rounded-2xl border px-2 py-4 text-sm font-semibold ' +
-                  (provider === p.key ? 'border-brand bg-brand/10 text-brand' : 'border-line bg-card')
-                }
-              >
-                {p.label}
+          {/* Method tabs — only when a payment QR is configured */}
+          {paymentQrUrl && (
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setMethod('qr')}
+                className={'rounded-2xl border py-3 text-sm font-semibold ' + (method === 'qr' ? 'border-brand bg-brand/10 text-brand' : 'border-line bg-card')}>
+                Scan QR to pay
               </button>
-            ))}
-          </div>
+              <button type="button" onClick={() => setMethod('momo')}
+                className={'rounded-2xl border py-3 text-sm font-semibold ' + (method === 'momo' ? 'border-brand bg-brand/10 text-brand' : 'border-line bg-card')}>
+                Mobile money
+              </button>
+            </div>
+          )}
 
-          <input
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            inputMode="tel"
-            placeholder="Mobile money number (e.g. 6XXXXXXXX)"
-            className="w-full rounded-xl bg-ink border border-line px-4 py-3 outline-none focus:border-brand"
-          />
+          {method === 'qr' && paymentQrUrl ? (
+            <div className="rounded-2xl border border-line bg-card p-4 text-center">
+              <p className="text-sm text-muted mb-2">Scan to pay {money(amount, currency)}</p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={paymentQrUrl} alt="Payment QR code" className="mx-auto w-56 h-56 rounded-lg bg-white p-2 object-contain" />
+              <p className="text-xs text-muted mt-2">Scan with your mobile money or bank app, complete the payment, then tap below.</p>
+              {error && <p className="text-sm text-red-400 mt-2">{error}</p>}
+              <button onClick={onPaid} className="mt-3 w-full rounded-full bg-brand text-black py-3 font-semibold">I&apos;ve paid</button>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-2">
+                {PROVIDERS.map((p) => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => setProvider(p.key)}
+                    className={
+                      'rounded-2xl border px-2 py-4 text-sm font-semibold ' +
+                      (provider === p.key ? 'border-brand bg-brand/10 text-brand' : 'border-line bg-card')
+                    }
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
 
-          {error && <p className="text-sm text-red-400">{error}</p>}
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                inputMode="tel"
+                placeholder="Mobile money number (e.g. 6XXXXXXXX)"
+                className="w-full rounded-xl bg-ink border border-line px-4 py-3 outline-none focus:border-brand"
+              />
 
-          <button onClick={pay} className="w-full rounded-full bg-brand text-black py-4 font-semibold">
-            Pay {money(amount, currency)}
-          </button>
+              {error && <p className="text-sm text-red-400">{error}</p>}
+
+              <button onClick={pay} className="w-full rounded-full bg-brand text-black py-4 font-semibold">
+                Pay {money(amount, currency)}
+              </button>
+            </>
+          )}
+
           <button onClick={onPayLater} className="w-full rounded-full border border-line py-3 text-sm text-muted">
             Pay at the counter instead
           </button>

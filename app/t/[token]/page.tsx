@@ -65,6 +65,7 @@ export default async function TablePage({ params }: { params: { token: string } 
       socialVideoUrl={((restaurant as any)?.settings?.social_video_url as string | undefined) ?? null}
       orderingEnabled={(restaurant as any)?.settings?.digital_ordering_enabled !== false}
       threeDEnabled={(pconfig as any)?.three_d_enabled !== false}
+      paymentQrUrl={((restaurant as any)?.settings?.payment_qr_url as string | undefined) ?? null}
     />
   );
 }
