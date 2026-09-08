@@ -23,6 +23,23 @@ export type MenuItem = {
   menu_item_3d_models: ItemModel[];
 };
 
+// Social share-links (vm.tiktok.com, vt.tiktok.com, fb.watch, youtu.be short
+// forms) redirect to the real post URL. Follow the redirect server-side so the
+// client can embed the video inline instead of bouncing the customer to the app.
+async function resolveShareUrl(url: string | null): Promise<string | null> {
+  if (!url) return null;
+  if (!/^https?:\/\/(vm\.tiktok\.com|vt\.tiktok\.com|fb\.watch)\//i.test(url)) return url;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 3000);
+    const res = await fetch(url, { redirect: 'follow', signal: ctrl.signal });
+    clearTimeout(t);
+    return res.url || url;
+  } catch {
+    return url;
+  }
+}
+
 export default async function TablePage({ params }: { params: { token: string } }) {
   const { data: qr } = await supabase.rpc('resolve_table_qr', { p_token: params.token });
 
@@ -53,6 +70,8 @@ export default async function TablePage({ params }: { params: { token: string } 
   // Platform-wide 3D/AR switch (anon-readable). Defaults on.
   const { data: pconfig } = await supabase.from('platform_config').select('three_d_enabled').eq('id', 1).maybeSingle();
 
+  const socialVideoUrl = await resolveShareUrl(((restaurant as any)?.settings?.social_video_url as string | undefined) ?? null);
+
   return (
     <MenuClient
       restaurant={restaurant ?? { id: info.restaurant_id, name: 'Menu', currency: 'XAF' }}
@@ -62,7 +81,7 @@ export default async function TablePage({ params }: { params: { token: string } 
       items={(items as unknown as MenuItem[]) ?? []}
       activity={(activity as { table_label: string; item_name: string; qty: number }[]) ?? []}
       videos={(videos as { id: string; url: string; title: string | null }[]) ?? []}
-      socialVideoUrl={((restaurant as any)?.settings?.social_video_url as string | undefined) ?? null}
+      socialVideoUrl={socialVideoUrl}
       orderingEnabled={(restaurant as any)?.settings?.digital_ordering_enabled !== false}
       threeDEnabled={(pconfig as any)?.three_d_enabled !== false}
       paymentQrUrl={((restaurant as any)?.settings?.payment_qr_url as string | undefined) ?? null}

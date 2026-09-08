@@ -14,7 +14,7 @@ type Activity = { table_label: string; item_name: string; qty: number };
 type Video = { id: string; url: string; title: string | null };
 
 function ytId(url: string): string | null {
-  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
   return m ? m[1] : null;
 }
 function platformOf(url: string): string {
@@ -24,19 +24,29 @@ function platformOf(url: string): string {
   if (/(youtube\.com|youtu\.be)/i.test(url)) return 'YouTube';
   return 'social';
 }
+// A plain video file the browser can play inline with a native <video> element
+// (uploaded clips, Supabase Storage links, any direct .mp4/.webm/.mov, HLS).
+function isDirectVideo(url: string): boolean {
+  return /\.(mp4|webm|ogg|ogv|mov|m4v|m3u8)(\?|#|$)/i.test(url);
+}
+
 // Inline-playable embed URL for the restaurant's preferred platform — the video
-// plays inside the smart menu, no leaving the app. Covers YouTube, TikTok,
-// Instagram (reel/post/tv) and Facebook; unknown URLs -> null (button fallback).
+// plays inside the smart menu, no leaving the app. Covers YouTube (incl. Shorts /
+// youtu.be / live), TikTok, Instagram (reel/post/tv), Facebook and Vimeo. Short
+// share-links (vm.tiktok.com, fb.watch) are expanded to their canonical URL on the
+// server before this runs. Unknown URLs -> null (rare; handled by the caller).
 function socialEmbed(url: string): { src: string; vertical: boolean } | null {
   const yt = ytId(url);
   if (yt) return { src: `https://www.youtube.com/embed/${yt}`, vertical: false };
-  const tk = url.match(/tiktok\.com\/(?:.*\/video\/|v\/)(\d+)/);
+  const tk = url.match(/tiktok\.com\/(?:.*\/video\/|v\/|embed\/v2\/)(\d+)/);
   if (tk) return { src: `https://www.tiktok.com/embed/v2/${tk[1]}`, vertical: true };
   const ig = url.match(/instagram\.com\/(p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i);
   if (ig) {
     const kind = ig[1].toLowerCase() === 'reels' ? 'reel' : ig[1].toLowerCase();
     return { src: `https://www.instagram.com/${kind}/${ig[2]}/embed`, vertical: true };
   }
+  const vim = url.match(/vimeo\.com\/(?:video\/)?(\d+)/i);
+  if (vim) return { src: `https://player.vimeo.com/video/${vim[1]}`, vertical: false };
   if (/(facebook\.com|fb\.watch)/i.test(url)) {
     return { src: `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=false`, vertical: false };
   }
@@ -75,6 +85,7 @@ export function MenuClient({
   const [openItem, setOpenItem] = useState<MenuItem | null>(null);
   const [showPopular, setShowPopular] = useState(false);
   const [activeCat, setActiveCat] = useState<string | null>(null); // null = show all
+  const [inlineVideo, setInlineVideo] = useState<string | null>(null); // in-app player overlay
   const [placing, setPlacing] = useState(false);
   const [placed, setPlaced] = useState<{ number: number; total: number } | null>(null);
   const [payment, setPayment] = useState<{ orderId: string; number: number; total: number } | null>(null);
@@ -313,6 +324,20 @@ export function MenuClient({
         <section className="px-5 pt-4">
           <p className="text-xs uppercase tracking-wide text-muted mb-2">Watch 🎬</p>
           {socialVideoUrl && (() => {
+            // 1) A direct video file — native inline player.
+            if (isDirectVideo(socialVideoUrl)) {
+              return (
+                <video
+                  src={socialVideoUrl}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="mb-3 w-full rounded-2xl border border-line bg-black"
+                  onPlay={() => logEvent(restaurant.id, null, 'view', session.id)}
+                />
+              );
+            }
+            // 2) A known platform — inline embed, plays inside the menu.
             const embed = socialEmbed(socialVideoUrl);
             if (embed) {
               return (
@@ -330,16 +355,17 @@ export function MenuClient({
                 </div>
               );
             }
+            // 3) Anything else — open in an in-app player overlay (an iframe inside
+            //    the menu), so the customer still never leaves for the social app.
             return (
-              <a
-                href={socialVideoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mb-3 flex items-center justify-between rounded-2xl border border-brand/50 bg-brand/10 px-4 py-3 font-semibold text-brand"
+              <button
+                type="button"
+                onClick={() => { setInlineVideo(socialVideoUrl); logEvent(restaurant.id, null, 'view', session.id); }}
+                className="mb-3 flex w-full items-center justify-between rounded-2xl border border-brand/50 bg-brand/10 px-4 py-3 font-semibold text-brand"
               >
-                <span>Watch our {platformOf(socialVideoUrl)} video</span>
+                <span>▶ Play our {platformOf(socialVideoUrl)} video</span>
                 <span>↗</span>
-              </a>
+              </button>
             );
           })()}
           {videos.length > 0 && (
@@ -380,6 +406,25 @@ export function MenuClient({
           </section>
         )}
       </div>
+
+      {inlineVideo && (
+        <div className="fixed inset-0 z-30 bg-black/90 flex items-center justify-center p-4" onClick={() => setInlineVideo(null)}>
+          <div className="w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-end mb-2">
+              <button onClick={() => setInlineVideo(null)} className="rounded-full border border-line px-4 py-1.5 text-sm text-white">Close ✕</button>
+            </div>
+            <div className="overflow-hidden rounded-2xl border border-line bg-black" style={{ height: '70vh' }}>
+              <iframe
+                src={inlineVideo}
+                title="Video"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="w-full h-full"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {openItem && (
         <div className="fixed inset-0 z-20 bg-black/70 flex items-end sm:items-center sm:justify-center" onClick={() => setOpenItem(null)}>
