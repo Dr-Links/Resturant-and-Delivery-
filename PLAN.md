@@ -67,6 +67,30 @@ Plus an **Expo/React Native driver app** (`apps/driver/`) for independent driver
   ID/licence/selfie to the private bucket and records paths on `driver_kyc`; new
   drivers are `pending` until an admin approves (closes the loop end-to-end).
 
+## Customer experience & owner content (✅ live)
+
+- **3D for every dish** — tapping any dish opens a 3D view: the uploaded model when
+  present, otherwise a friendly floating placeholder — both with an **animated
+  cartoon chef 👨‍🍳**. New dishes are included automatically. (Real per-dish 3D still
+  comes from uploads or a future AI photo→3D step; the placeholder means it never
+  dead-ends.) AR "view in your space" has step-by-step guidance + a loading state.
+- **Table activity** — the "what other tables ordered" strip shows dish + table label
+  only (no names/prices/personal info), gated by the `show_table_activity` setting,
+  window **24h** (migration `0025`). `get_table_activity` is the only public path to
+  cross-table data.
+- **Watch section** — customers see the restaurant's uploaded videos while browsing
+  the menu (not only on the post-order screen), plus one **featured social video**
+  (`restaurants.settings.social_video_url`): YouTube embeds inline; Instagram/TikTok/
+  Facebook show a "Watch on <platform>" button.
+- **Owner content management** (restaurant dashboard):
+  - **Settings** (`/dashboard/settings`) — instant toggles for `show_table_activity`,
+    `digital_ordering_enabled`, `kitchen_screen_enabled`, plus the featured social
+    video link.
+  - **Menu** — add a dish (name/price/category) and delete (cascades photos/models),
+    plus inline price + available/sold-out/hidden.
+  - **Photos** — per-dish add/remove (public `item-images` bucket; first photo = poster).
+  - **Videos** — upload/remove for the customer Watch screen.
+
 ## Integrations / API-key manager (✅ live) — migrations `0022`, `0023`
 
 `/admin/integrations` manages **every** third-party credential in one place, each
