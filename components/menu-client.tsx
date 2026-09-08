@@ -96,6 +96,22 @@ export function MenuClient({
     if (model(i)) logEvent(restaurant.id, i.id, 'ar_open', session.id);
   };
 
+  const renderCard = (i: MenuItem) => (
+    <button key={i.id} onClick={() => openAndLog(i)} className="text-left rounded-2xl border border-line bg-card overflow-hidden flex">
+      <div className="flex-1 p-4">
+        <div className="flex items-center gap-2"><h3 className="font-semibold">{i.name}</h3>{model(i) && <span className="rounded-full bg-brand/15 text-brand text-[10px] px-2 py-0.5 border border-brand/40">AR</span>}</div>
+        {i.description && <p className="mt-1 text-sm text-muted line-clamp-2">{i.description}</p>}
+        <p className="mt-2 font-semibold text-brand">{money(i.price, cur)}</p>
+      </div>
+      {img(i) && (<img src={img(i)!} alt={i.name} className="w-28 h-28 object-cover" />)}
+    </button>
+  );
+
+  // Items whose category is missing or inactive would otherwise never render —
+  // group them under "More" so every available dish shows to customers.
+  const catIds = new Set(categories.map((c) => c.id));
+  const otherItems = items.filter((i) => !i.category_id || !catIds.has(i.category_id));
+
   async function placeOrder() {
     if (count === 0 || placing) return;
     setPlacing(true);
@@ -282,21 +298,17 @@ export function MenuClient({
           return (
             <section key={cat.id}>
               <h2 className="text-lg font-bold mb-3">{cat.name}</h2>
-              <div className="grid grid-cols-1 gap-3">
-                {catItems.map((i) => (
-                  <button key={i.id} onClick={() => openAndLog(i)} className="text-left rounded-2xl border border-line bg-card overflow-hidden flex">
-                    <div className="flex-1 p-4">
-                      <div className="flex items-center gap-2"><h3 className="font-semibold">{i.name}</h3>{model(i) && <span className="rounded-full bg-brand/15 text-brand text-[10px] px-2 py-0.5 border border-brand/40">AR</span>}</div>
-                      {i.description && <p className="mt-1 text-sm text-muted line-clamp-2">{i.description}</p>}
-                      <p className="mt-2 font-semibold text-brand">{money(i.price, cur)}</p>
-                    </div>
-                    {img(i) && (<img src={img(i)!} alt={i.name} className="w-28 h-28 object-cover" />)}
-                  </button>
-                ))}
-              </div>
+              <div className="grid grid-cols-1 gap-3">{catItems.map(renderCard)}</div>
             </section>
           );
         })}
+
+        {otherItems.length > 0 && (
+          <section>
+            <h2 className="text-lg font-bold mb-3">{categories.length > 0 ? 'More' : 'Menu'}</h2>
+            <div className="grid grid-cols-1 gap-3">{otherItems.map(renderCard)}</div>
+          </section>
+        )}
       </div>
 
       {openItem && (

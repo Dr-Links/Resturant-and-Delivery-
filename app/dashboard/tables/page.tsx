@@ -14,5 +14,5 @@ export default async function TablesPage() {
     .eq('restaurant_id', restaurant.id)
     .order('label');
 
-  return <TablesQR tables={(data as any) ?? []} />;
+  return <TablesQR restaurantId={restaurant.id} tables={(data as any) ?? []} />;
 }
