@@ -73,30 +73,39 @@ Plus an **Expo/React Native driver app** (`apps/driver/`) for independent driver
   present, otherwise a friendly floating placeholder — both with an **animated
   cartoon chef 👨‍🍳**. New dishes are included automatically. (Real per-dish 3D still
   comes from uploads or a future AI photo→3D step; the placeholder means it never
-  dead-ends.) AR "view in your space" has step-by-step guidance + a loading state.
+  dead-ends.) The viewer uses `disable-pan` / `touch-action:none` so dragging
+  **rotates the dish cleanly** without shifting position; AR "view in your space" has
+  step-by-step guidance + a loading state.
 - **Table activity** — the "what other tables ordered" strip shows dish + table label
   only (no names/prices/personal info), gated by the `show_table_activity` setting,
-  window **24h** (migration `0025`). `get_table_activity` is the only public path to
-  cross-table data.
-- **Watch section** — customers see the restaurant's uploaded videos while browsing
-  the menu (not only on the post-order screen), plus one **featured social video**
-  (`restaurants.settings.social_video_url`): YouTube embeds inline; Instagram/TikTok/
-  Facebook show a "Watch on <platform>" button.
-- **Owner content management** (restaurant dashboard):
-  - **Settings** (`/dashboard/settings`) — instant toggles for `show_table_activity`,
-    `digital_ordering_enabled`, `kitchen_screen_enabled`, plus the featured social
-    video link.
-  - **Menu** — add a dish (name/price/category) and delete (cascades photos/models),
-    plus inline price + available/sold-out/hidden.
+  window **24h** (migration `0025`). Each chip is **tap-to-view** (opens the matching
+  dish in 3D). `get_table_activity` is the only public path to cross-table data.
+- **Watch section** — customers see the restaurant's uploaded ("normal") videos while
+  browsing the menu (not only on the post-order screen), plus one **featured social
+  video** (`restaurants.settings.social_video_url`) that **plays inline** for the
+  preferred platform — YouTube, TikTok (vertical), Facebook; Instagram falls back to a
+  "Watch on Instagram" button.
+- **Digital ordering off-switch** — turning off `digital_ordering_enabled` makes the
+  customer menu **browse-only** (no add-to-cart / cart / place-order) and **hides the
+  owner Orders tab**.
+- **Owner content management** (restaurant dashboard), all reflected in the customer
+  `/t` view on next load (it is `force-dynamic`):
+  - **Settings** (`/dashboard/settings`) — edit the **restaurant name**, **add/delete
+    menu categories** (delete keeps dishes, un-categorised), instant feature toggles
+    (`show_table_activity`, `digital_ordering_enabled`, `kitchen_screen_enabled`), and
+    the featured social video link.
+  - **Menu** — add a dish (name/price/category **+ optional photo**) and delete
+    (cascades photos/models), plus inline price + available/sold-out/hidden.
   - **Photos** — per-dish add/remove (public `item-images` bucket; first photo = poster).
   - **Videos** — upload/remove for the customer Watch screen.
 
-## Integrations / API-key manager (✅ live) — migrations `0022`, `0023`
+## Integrations / API-key manager (✅ live) — migrations `0022`–`0024`, `0026`
 
 `/admin/integrations` manages **every** third-party credential in one place, each
 add / delete / enable / edit: **Fapshi** (one key → MTN + Orange), **MTN MoMo** &
 **Orange Money** direct, **Google Maps**, **Anthropic** (AI), **Resend** + **Twilio**
-(notifications), and **arbitrary custom providers**.
+(notifications), a reserved **3D model generation (AI photo→3D)** slot, and
+**arbitrary custom providers**.
 
 - **Secrets encrypted at rest in Supabase Vault**; the settings row stores only a
   `vault_secret_id`, never plaintext.
@@ -163,14 +172,20 @@ and takes effect immediately — no redeploy, no code.**
    `notify-fanout` edge function now reads them from the store; `supabase secrets set …`
    still works as a fallback).
 
-## Known gaps / future ideas (optional)
+## Known gaps / future ideas (optional — only remaining *code* work)
 
+- **AI photo→3D generation** — the biggest one. Dishes without an uploaded model show
+  the chef placeholder; real per-dish 3D needs a 3D-gen service (Meshy/Luma/etc.). The
+  dashboard slot is ready (**3D model generation** provider, migration `0026`, keys
+  `THREEDGEN_*`); the generation wiring (call the API from a dish photo, store the
+  resulting `.glb` on `menu_item_3d_models`) is **not built yet**. Enter the key when
+  you have it, then this gets wired.
+- Orange **disbursement** (driver payout) is not wired — falls back to mock; only MTN
+  disbursement is implemented.
 - The Expo driver app is unverified in CI (excluded from the Next build); its
   gateway-settlement change needs a device/EAS build to confirm.
 - `driver_kyc.*_url` columns now hold Storage **paths**, not URLs (documented; a future
   migration could rename them to `*_path`).
-- Orange **disbursement** (driver payout) is not wired — falls back to mock; only MTN
-  disbursement is implemented.
 - Interactive (pan/zoom) Google maps would require exposing a referrer-restricted
   browser key — deliberately not done, to keep the Maps key server-side only.
 
