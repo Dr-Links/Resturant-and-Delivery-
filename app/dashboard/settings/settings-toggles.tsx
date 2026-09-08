@@ -28,6 +28,17 @@ export function SettingsToggles({ restaurantId, initial }: { restaurantId: strin
   const [settings, setSettings] = useState<Record<string, unknown>>(initial);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [socialUrl, setSocialUrl] = useState<string>((initial.social_video_url as string) ?? '');
+  const [savingSocial, setSavingSocial] = useState(false);
+
+  async function saveSocial() {
+    setSavingSocial(true); setMsg(null);
+    const next = { ...settings, social_video_url: socialUrl.trim() || null };
+    const { error } = await supabase.from('restaurants').update({ settings: next, updated_at: new Date().toISOString() }).eq('id', restaurantId);
+    setSavingSocial(false);
+    if (error) { setMsg('Could not save the video link.'); return; }
+    setSettings(next); setMsg('Saved.'); router.refresh();
+  }
 
   async function toggle(key: string) {
     const prev = settings;
@@ -86,6 +97,29 @@ export function SettingsToggles({ restaurantId, initial }: { restaurantId: strin
             </div>
           );
         })}
+      </div>
+
+      <div className="rounded-2xl border border-line bg-card p-4 mt-4">
+        <p className="font-medium">Featured social video</p>
+        <p className="text-xs text-muted mt-0.5 mb-3">
+          Link one video from your social media (YouTube, Instagram, TikTok, Facebook). Customers see it in the menu&apos;s
+          Watch section. YouTube plays inline; others open in the app. Leave blank to remove.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            value={socialUrl}
+            onChange={(e) => setSocialUrl(e.target.value)}
+            placeholder="https://youtube.com/watch?v=…  or  instagram.com/reel/…"
+            className="flex-1 min-w-[220px] rounded-xl bg-ink border border-line px-3 py-2 text-sm outline-none focus:border-brand"
+          />
+          <button
+            onClick={saveSocial}
+            disabled={savingSocial}
+            className="rounded-full bg-brand text-black px-5 py-2 text-sm font-semibold disabled:opacity-50"
+          >
+            {savingSocial ? 'Saving…' : 'Save'}
+          </button>
+        </div>
       </div>
     </div>
   );

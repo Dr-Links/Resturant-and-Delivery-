@@ -13,6 +13,18 @@ type Restaurant = { id: string; name: string; currency: string };
 type Activity = { table_label: string; item_name: string; qty: number };
 type Video = { id: string; url: string; title: string | null };
 
+function ytId(url: string): string | null {
+  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+function platformOf(url: string): string {
+  if (/instagram\.com/i.test(url)) return 'Instagram';
+  if (/tiktok\.com/i.test(url)) return 'TikTok';
+  if (/(facebook\.com|fb\.watch)/i.test(url)) return 'Facebook';
+  if (/(youtube\.com|youtu\.be)/i.test(url)) return 'YouTube';
+  return 'social';
+}
+
 function Stars({ value, onChange }: { value: number; onChange: (n: number) => void }) {
   return (
     <div className="flex gap-1">
@@ -26,7 +38,7 @@ function Stars({ value, onChange }: { value: number; onChange: (n: number) => vo
 }
 
 export function MenuClient({
-  restaurant, table, session, categories, items, activity, videos,
+  restaurant, table, session, categories, items, activity, videos, socialVideoUrl,
 }: {
   restaurant: Restaurant;
   table: { id: string; label: string };
@@ -35,6 +47,7 @@ export function MenuClient({
   items: MenuItem[];
   activity: Activity[];
   videos: Video[];
+  socialVideoUrl?: string | null;
 }) {
   const [cart, setCart] = useState<Record<string, number>>({});
   const [openItem, setOpenItem] = useState<MenuItem | null>(null);
@@ -184,6 +197,50 @@ export function MenuClient({
         </section>
       )}
 
+      {(socialVideoUrl || videos.length > 0) && (
+        <section className="px-5 pt-4">
+          <p className="text-xs uppercase tracking-wide text-muted mb-2">Watch 🎬</p>
+          {socialVideoUrl && (
+            ytId(socialVideoUrl) ? (
+              <div className="mb-3 aspect-video overflow-hidden rounded-2xl border border-line">
+                <iframe
+                  src={`https://www.youtube.com/embed/${ytId(socialVideoUrl)}`}
+                  title="Featured video"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="w-full h-full"
+                />
+              </div>
+            ) : (
+              <a
+                href={socialVideoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mb-3 flex items-center justify-between rounded-2xl border border-brand/50 bg-brand/10 px-4 py-3 font-semibold text-brand"
+              >
+                <span>Watch our {platformOf(socialVideoUrl)} video</span>
+                <span>↗</span>
+              </a>
+            )
+          )}
+          {videos.length > 0 && (
+            <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+              {videos.map((v) => (
+                <video
+                  key={v.id}
+                  src={v.url}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="shrink-0 w-64 rounded-2xl border border-line bg-card"
+                  onPlay={() => logEvent(restaurant.id, null, 'view', session.id)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       <div className="px-5 pt-5 space-y-8">
         {categories.map((cat) => {
           const catItems = items.filter((i) => i.category_id === cat.id);
@@ -212,13 +269,12 @@ export function MenuClient({
         <div className="fixed inset-0 z-20 bg-black/70 flex items-end sm:items-center sm:justify-center" onClick={() => setOpenItem(null)}>
           <div className="w-full sm:max-w-md bg-ink border-t sm:border border-line rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="p-5">
-              {model(openItem) ? (<ARViewer glb={model(openItem)!.glb_url!} usdz={model(openItem)!.usdz_url} poster={img(openItem)} alt={openItem.name} />) : img(openItem) ? (<img src={img(openItem)!} alt={openItem.name} className="w-full h-56 object-cover rounded-2xl" />) : null}
+              <ARViewer glb={model(openItem)?.glb_url ?? null} usdz={model(openItem)?.usdz_url ?? null} poster={img(openItem)} alt={openItem.name} />
               <div className="mt-4">
                 <h2 className="text-2xl font-bold">{openItem.name}</h2>
                 <p className="mt-1 text-brand font-semibold text-lg">{money(openItem.price, cur)}</p>
                 {openItem.description && <p className="mt-3 text-muted">{openItem.description}</p>}
                 {openItem.ingredients && (<p className="mt-3 text-sm text-muted"><span className="text-zinc-300">Ingredients: </span>{openItem.ingredients}</p>)}
-                {!model(openItem) && <p className="mt-3 text-xs text-muted">3D/AR model coming soon for this dish.</p>}
               </div>
               <div className="mt-5 flex items-center gap-3">
                 {cart[openItem.id] ? (<div className="flex items-center gap-4 rounded-full border border-line px-4 py-2"><button onClick={() => remove(openItem.id)} className="text-xl">−</button><span className="min-w-6 text-center font-semibold">{cart[openItem.id]}</span><button onClick={() => add(openItem.id)} className="text-xl">+</button></div>) : (<button onClick={() => add(openItem.id)} className="flex-1 rounded-full bg-brand px-6 py-3 font-semibold text-black">Add to order</button>)}

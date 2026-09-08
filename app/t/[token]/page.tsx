@@ -36,7 +36,7 @@ export default async function TablePage({ params }: { params: { token: string } 
   };
 
   const [{ data: restaurant }, { data: categories }, { data: items }, { data: activity }, { data: videos }] = await Promise.all([
-    supabase.from('restaurants').select('id,name,currency').eq('id', info.restaurant_id).single(),
+    supabase.from('restaurants').select('id,name,currency,settings').eq('id', info.restaurant_id).single(),
     supabase.from('menu_categories').select('id,name,kind,sort_order').eq('restaurant_id', info.restaurant_id).eq('is_active', true).order('sort_order'),
     supabase.from('menu_items')
       .select('id,category_id,name,description,ingredients,price,labels,menu_item_images(url,sort_order),menu_item_3d_models(glb_url,usdz_url,status)')
@@ -54,6 +54,7 @@ export default async function TablePage({ params }: { params: { token: string } 
       items={(items as unknown as MenuItem[]) ?? []}
       activity={(activity as { table_label: string; item_name: string; qty: number }[]) ?? []}
       videos={(videos as { id: string; url: string; title: string | null }[]) ?? []}
+      socialVideoUrl={((restaurant as any)?.settings?.social_video_url as string | undefined) ?? null}
     />
   );
 }
