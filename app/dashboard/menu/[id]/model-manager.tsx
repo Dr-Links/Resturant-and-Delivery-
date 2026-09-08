@@ -37,9 +37,44 @@ export function ModelManager({ restaurantId, item }: { restaurantId: string; ite
   const [usdz, setUsdz] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [genBusy, setGenBusy] = useState(false);
+  const [genMsg, setGenMsg] = useState<string | null>(null);
 
   const poster = [...(item.menu_item_images ?? [])].sort((a, b) => a.sort_order - b.sort_order)[0]?.url ?? null;
   const models = item.menu_item_3d_models ?? [];
+
+  async function generate3d() {
+    if (genBusy) return;
+    if (!poster) { setGenMsg('Add a photo to this dish first (Photos above).'); return; }
+    setGenBusy(true); setGenMsg('Starting…');
+    try {
+      const res = await fetch('/api/threed/generate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId: item.id }),
+      });
+      const data = await res.json();
+      if (data.configured === false) {
+        setGenBusy(false);
+        setGenMsg('Add a 3D-gen API key under Admin → Integrations (3D model generation) to enable this.');
+        return;
+      }
+      if (!res.ok || !data.jobId) { setGenBusy(false); setGenMsg('Could not start generation. Please try again.'); return; }
+      setGenMsg('Generating a 3D model from the photo… this can take a few minutes.');
+      const jobId = data.jobId as string;
+      const poll = async () => {
+        try {
+          const r = await fetch(`/api/threed/status?jobId=${jobId}`);
+          const s = await r.json();
+          if (s.status === 'succeeded') { setGenBusy(false); setGenMsg('Done! Review the preview below, then Approve → Publish.'); router.refresh(); return; }
+          if (s.status === 'failed') { setGenBusy(false); setGenMsg('Generation failed — try a clearer, well-lit photo of the dish.'); return; }
+          setGenMsg(`Generating… ${s.progress != null ? s.progress + '%' : 'in progress'}`);
+          setTimeout(poll, 6000);
+        } catch { setTimeout(poll, 6000); }
+      };
+      setTimeout(poll, 6000);
+    } catch {
+      setGenBusy(false); setGenMsg('Network error. Please try again.');
+    }
+  }
 
   async function uploadTo(bucket: string, file: File, kind: string) {
     const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -127,7 +162,17 @@ export function ModelManager({ restaurantId, item }: { restaurantId: string; ite
           {busy ? 'Working…' : 'Upload model'}
         </button>
         {msg && <p className="mt-3 text-sm text-muted">{msg}</p>}
-        <p className="mt-3 text-xs text-muted">AI photo-to-3D generation plugs in here later — same approve-before-publish flow.</p>
+        <div className="mt-4 border-t border-line pt-3">
+          <button
+            onClick={generate3d}
+            disabled={genBusy}
+            className="rounded-full border border-brand/50 bg-brand/10 text-brand px-4 py-2 text-sm font-semibold disabled:opacity-50"
+          >
+            {genBusy ? 'Generating…' : '✨ Generate 3D from the dish photo'}
+          </button>
+          {genMsg && <p className="mt-2 text-xs text-muted">{genMsg}</p>}
+          <p className="mt-1 text-[11px] text-muted">Uses the dish photo + your 3D-gen API key (Admin → Integrations). Same approve-before-publish flow.</p>
+        </div>
       </div>
 
       {/* Existing models */}
