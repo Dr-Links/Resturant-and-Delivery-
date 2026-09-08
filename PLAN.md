@@ -69,22 +69,31 @@ Plus an **Expo/React Native driver app** (`apps/driver/`) for independent driver
 
 ## Customer experience & owner content (✅ live)
 
-- **3D for every dish** — tapping any dish opens a 3D view: the uploaded model when
-  present, otherwise a friendly floating placeholder — both with an **animated
-  cartoon chef 👨‍🍳**. New dishes are included automatically. (Real per-dish 3D still
-  comes from uploads or a future AI photo→3D step; the placeholder means it never
-  dead-ends.) The viewer uses `disable-pan` / `touch-action:none` so dragging
-  **rotates the dish cleanly** without shifting position; AR "view in your space" has
-  step-by-step guidance + a loading state.
-- **Table activity** — the "what other tables ordered" strip shows dish + table label
-  only (no names/prices/personal info), gated by the `show_table_activity` setting,
-  window **24h** (migration `0025`). Each chip is **tap-to-view** (opens the matching
-  dish in 3D). `get_table_activity` is the only public path to cross-table data.
-- **Watch section** — customers see the restaurant's uploaded ("normal") videos while
-  browsing the menu (not only on the post-order screen), plus one **featured social
-  video** (`restaurants.settings.social_video_url`) that **plays inline** for the
-  preferred platform — YouTube, TikTok (vertical), Facebook; Instagram falls back to a
-  "Watch on Instagram" button.
+**The smart menu** — one screen after a QR scan (`/t/[token]`, `force-dynamic`).
+Everything below happens in that single general-menu view, no leaving the page:
+
+- **Scan → browse → tap any dish → 3D.** Tapping a dish opens a 3D view: the uploaded
+  model when present, otherwise a friendly floating placeholder — both with an
+  **animated cartoon chef 👨‍🍳**. New dishes are included automatically. (Real per-dish
+  3D comes from uploads or the AI photo→3D step; the placeholder means it never
+  dead-ends.) The viewer uses `disable-pan` / `touch-action:none` so dragging **rotates
+  the dish cleanly** without shifting position; AR "view in your space" has step-by-step
+  guidance + a loading state. A **platform-wide 3D switch** (SaaS admin → Settings,
+  `platform_config.three_d_enabled`, migration `0028`) can disable 3D everywhere
+  (photos only); default on, so working models like the Avocado Bowl keep showing.
+- **See what other tables ordered — and view those dishes in 3D.** The "Popular right
+  now" strip shows dish + table label only (no names/prices/personal info), gated by
+  `show_table_activity`, 24h window (migration `0025`). Each chip is **tap-to-view**:
+  it opens the matching dish in the same 3D view. `get_table_activity` is the only
+  public path to cross-table data.
+- **Watch section — social + uploaded videos, all inline.** The restaurant's uploaded
+  ("normal") videos are swipeable in the menu (not only post-order), plus one **featured
+  social video** (`restaurants.settings.social_video_url`) that **plays inline without
+  leaving the app** for **YouTube, TikTok, Instagram (reel/post/tv), and Facebook**
+  (via each platform's `/embed`); only genuinely unknown URLs fall back to a link.
+- **Every available dish shows.** Dishes with a missing/inactive category render under a
+  "More" section (previously they were hidden from customers), so owner menu changes
+  always appear.
 - **Digital ordering off-switch** — turning off `digital_ordering_enabled` makes the
   customer menu **browse-only** (no add-to-cart / cart / place-order) and **hides the
   owner Orders tab**.
@@ -98,6 +107,8 @@ Plus an **Expo/React Native driver app** (`apps/driver/`) for independent driver
     (cascades photos/models), plus inline price + available/sold-out/hidden.
   - **Photos** — per-dish add/remove (public `item-images` bucket; first photo = poster).
   - **Videos** — upload/remove for the customer Watch screen.
+  - **Tables & QR** — add a table (creates the table + its one permanent QR) / delete /
+    print. Each table's QR opens the smart menu at `/t/<token>`.
 
 ## Integrations / API-key manager (✅ live) — migrations `0022`–`0024`, `0026`
 
