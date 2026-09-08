@@ -74,6 +74,7 @@ export function MenuClient({
   const [cart, setCart] = useState<Record<string, number>>({});
   const [openItem, setOpenItem] = useState<MenuItem | null>(null);
   const [showPopular, setShowPopular] = useState(false);
+  const [activeCat, setActiveCat] = useState<string | null>(null); // null = show all
   const [placing, setPlacing] = useState(false);
   const [placed, setPlaced] = useState<{ number: number; total: number } | null>(null);
   const [payment, setPayment] = useState<{ orderId: string; number: number; total: number } | null>(null);
@@ -123,9 +124,20 @@ export function MenuClient({
   const otherItems = items.filter((i) => !i.category_id || !catIds.has(i.category_id));
   const shownCategories = categories.filter((cat) => items.some((i) => i.category_id === cat.id));
 
-  const scrollToCat = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  // Group "what other tables ordered" by table so each row is labelled (Table 8, Table 12…).
+  const activityByTable = useMemo(() => {
+    const m = new Map<string, Activity[]>();
+    for (const a of activity) {
+      const arr = m.get(a.table_label) ?? [];
+      arr.push(a);
+      m.set(a.table_label, arr);
+    }
+    return Array.from(m.entries());
+  }, [activity]);
+
+  const chipCls = (active: boolean) =>
+    'shrink-0 rounded-full border px-3 py-1.5 text-sm whitespace-nowrap ' +
+    (active ? 'border-brand bg-brand/10 text-brand' : 'border-line bg-card hover:border-brand');
 
   async function placeOrder() {
     if (count === 0 || placing) return;
@@ -252,11 +264,14 @@ export function MenuClient({
                 🔥 Others ordered
               </button>
             )}
+            {shownCategories.length + (otherItems.length > 0 ? 1 : 0) > 1 && (
+              <button onClick={() => setActiveCat(null)} className={chipCls(activeCat === null)}>All</button>
+            )}
             {shownCategories.map((cat) => (
-              <button key={cat.id} onClick={() => scrollToCat(`cat-${cat.id}`)} className="shrink-0 rounded-full border border-line bg-card px-3 py-1.5 text-sm hover:border-brand">{cat.name}</button>
+              <button key={cat.id} onClick={() => setActiveCat(cat.id)} className={chipCls(activeCat === cat.id)}>{cat.name}</button>
             ))}
             {otherItems.length > 0 && (
-              <button onClick={() => scrollToCat('cat-more')} className="shrink-0 rounded-full border border-line bg-card px-3 py-1.5 text-sm hover:border-brand">{categories.length > 0 ? 'More' : 'Menu'}</button>
+              <button onClick={() => setActiveCat('more')} className={chipCls(activeCat === 'more')}>{categories.length > 0 ? 'More' : 'Menu'}</button>
             )}
           </div>
         )}
@@ -265,23 +280,30 @@ export function MenuClient({
       {showPopular && activity.length > 0 && (
         <section className="px-5 pt-4">
           <div className="rounded-2xl border border-line bg-card p-3">
-            <p className="text-xs uppercase tracking-wide text-muted mb-2">What other tables ordered · tap to view</p>
-            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-              {activity.map((a, idx) => {
-                const match = items.find((i) => i.name.toLowerCase() === a.item_name.toLowerCase());
-                return (
-                  <button
-                    key={idx}
-                    onClick={() => match && openAndLog(match)}
-                    disabled={!match}
-                    className="shrink-0 rounded-full border border-line bg-ink px-3 py-1.5 text-sm flex items-center gap-1.5 disabled:opacity-70 enabled:hover:border-brand transition-colors"
-                  >
-                    <span>🔥</span>
-                    <span className="text-brand font-semibold">{a.item_name}</span>
-                    {a.qty > 1 && <span className="text-muted">×{a.qty}</span>}
-                  </button>
-                );
-              })}
+            <p className="text-xs uppercase tracking-wide text-muted mb-2">What other tables ordered · tap a dish to view</p>
+            <div className="space-y-3">
+              {activityByTable.map(([label, rows]) => (
+                <div key={label}>
+                  <p className="text-xs font-semibold text-zinc-300 mb-1.5">Table {label}</p>
+                  <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    {rows.map((a, idx) => {
+                      const match = items.find((i) => i.name.toLowerCase() === a.item_name.toLowerCase());
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => match && openAndLog(match)}
+                          disabled={!match}
+                          className="shrink-0 rounded-full border border-line bg-ink px-3 py-1.5 text-sm flex items-center gap-1.5 disabled:opacity-70 enabled:hover:border-brand transition-colors"
+                        >
+                          <span>🔥</span>
+                          <span className="text-brand font-semibold">{a.item_name}</span>
+                          {a.qty > 1 && <span className="text-muted">×{a.qty}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -340,18 +362,19 @@ export function MenuClient({
 
       <div className="px-5 pt-5 space-y-8">
         {categories.map((cat) => {
+          if (activeCat !== null && activeCat !== cat.id) return null;
           const catItems = items.filter((i) => i.category_id === cat.id);
           if (catItems.length === 0) return null;
           return (
-            <section key={cat.id} id={`cat-${cat.id}`} className="scroll-mt-32">
+            <section key={cat.id}>
               <h2 className="text-lg font-bold mb-3">{cat.name}</h2>
               <div className="grid grid-cols-1 gap-3">{catItems.map(renderCard)}</div>
             </section>
           );
         })}
 
-        {otherItems.length > 0 && (
-          <section id="cat-more" className="scroll-mt-32">
+        {otherItems.length > 0 && (activeCat === null || activeCat === 'more') && (
+          <section>
             <h2 className="text-lg font-bold mb-3">{categories.length > 0 ? 'More' : 'Menu'}</h2>
             <div className="grid grid-cols-1 gap-3">{otherItems.map(renderCard)}</div>
           </section>
