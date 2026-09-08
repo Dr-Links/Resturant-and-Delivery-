@@ -19,6 +19,7 @@ export default async function MenuPage() {
 
   return (
     <MenuManager
+      restaurantId={restaurant.id}
       currency={restaurant.currency}
       categories={(categories as any) ?? []}
       initialItems={(items as any) ?? []}
